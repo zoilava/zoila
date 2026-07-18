@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Medicine 2028 - Integrated Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        cream: '#FAF9F6', lavender: '#E8DFF5', mint: '#D1E8E2', blush: '#F4E1E1',
+                        dark: '#1e293b', nw: { light: '#5c54c5', dark: '#3e3796' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Icons & Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        
+        /* Custom Elegant Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .tab-btn.active { background-color: #e2e8f0; color: #0f172a; font-weight: 600; border-left: 4px solid #3b82f6; }
+        
+        /* Finance Module Specific Styles */
+        .details-grid { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-out; }
+        .details-grid.open { grid-template-rows: 1fr; }
+        .details-inner { overflow: hidden; }
+        .wave-bg {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; opacity: 0.15; pointer-events: none;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 800 200' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 100 C 200 0, 400 200, 800 100 L 800 200 L 0 200 Z' fill='white'/%3E%3C/svg%3E") no-repeat bottom;
+            background-size: cover;
+        }
+        .modal-overlay { transition: opacity 0.3s ease-out; }
+        .modal-overlay.hidden { pointer-events: none; }
+        .modal-box { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1); }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex flex-col md:flex-row overflow-hidden relative">
+
+    <!-- Auth Overlay (Hidden when logged in) -->
+    <div id="auth-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex justify-center items-center p-4">
+        
+        <!-- Initial Loading State -->
+        <div id="auth-loading" class="bg-white rounded-2xl shadow-2xl p-8 text-center flex flex-col items-center justify-center max-w-sm w-full">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-4"></i>
+            <h2 class="text-xl font-bold text-slate-800">Verifying Access...</h2>
+            <p class="text-sm text-slate-500 mt-2">Checking secure session</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="auth-form-container" class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center hidden">
+            <div class="w-16 h-16 bg-blue-600 rounded-2xl flex justify-center items-center text-white text-3xl mx-auto mb-4 shadow-lg"><i class="fa-solid fa-user-doctor"></i></div>
+            <h2 class="text-2xl font-black text-slate-800 mb-1">MedPortal Access</h2>
+            <p class="text-sm text-slate-500 mb-6">Log in to safely sync academic and financial data.</p>
+            
+            <form id="auth-form" class="space-y-4" onsubmit="event.preventDefault(); loginUser();">
+                <input type="email" id="auth-email" placeholder="Email Address" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-left">
+                <input type="password" id="auth-password" placeholder="Password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-left">
+                <div id="auth-error" class="text-sm text-red-600 bg-red-50 p-2 rounded-lg hidden font-medium"></div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" id="btn-login" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition-colors shadow-sm">Log In</button>
+                    <button type="button" onclick="registerUser()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl font-bold transition-colors">Sign Up</button>
+                </div>
+            </form>
+            <div class="mt-6 border-t border-slate-100 pt-4">
+                <button type="button" onclick="loginAnonymously()" class="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors"><i class="fa-solid fa-ghost mr-1"></i> Continue Anonymously</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Enlarge Modal -->
+    <div id="day-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[90] hidden flex justify-center items-center p-4" onclick="closeDayModal(event)">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]" onclick="event.stopPropagation()">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 id="day-modal-title" class="font-black text-lg text-slate-800">Date</h3>
+                <button onclick="closeDayModal()" class="text-slate-400 hover:text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="day-modal-content" class="p-5 overflow-y-auto flex-1 bg-slate-50/50"></div>
+        </div>
+    </div>
+
+    <aside class="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-20 shrink-0">
+        <div class="p-6 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex justify-center items-center text-white font-bold text-xl shadow-md"><i class="fa-solid fa-user-doctor"></i></div>
+            <div>
+                <h1 class="font-bold text-md leading-tight">Medicine 2028</h1>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Road to MD</p>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto p-4 space-y-2 flex flex-row md:flex-col overflow-x-auto">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn active flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-chart-pie w-5 text-center"></i> Overview
+            </button>
+            <button onclick="switchTab('triage')" id="tab-triage" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-layer-group w-5 text-center"></i> Triage Engine
+            </button>
+            <button onclick="switchTab('schedule')" id="tab-schedule" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-calendar-week w-5 text-center"></i> Master Schedule
+            </button>
+            <button onclick="switchTab('study')" id="tab-study" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-brain w-5 text-center"></i> Study & Resources
+            </button>
+            <button onclick="switchTab('wellness')" id="tab-wellness" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-teal-600 hover:bg-teal-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-heart-pulse w-5 text-center"></i> Wellness Hub
+            </button>
+            <div class="hidden md:block my-2 border-t border-slate-100"></div>
+            <button onclick="switchTab('finance')" id="tab-finance" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-wallet w-5 text-center"></i> Personal Finance
+            </button>
+            <button onclick="switchTab('treasurer')" id="tab-treasurer" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-amber-600 hover:bg-amber-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-sack-dollar w-5 text-center"></i> Class Treasurer
+            </button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn flex-shrink-0 md:flex-shrink w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 transition-all text-sm text-left">
+                <i class="fa-solid fa-gear w-5 text-center"></i> Settings
+            </button>
+        </nav>
+        <div class="p-4 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center bg-slate-50">
+            <span id="sync-status" class="font-medium"><i class="fa-solid fa-circle-notch fa-spin text-blue-400"></i> Connecting...</span>
+        </div>
+    </aside>
+
+    <main class="flex-1 bg-slate-50 overflow-y-auto p-0 md:p-8 relative">
+        <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-lg transform transition-transform duration-300 translate-y-32 opacity-0 z-[110] font-medium border border-slate-700 flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i> <span id="toast-msg">Success</span>
+        </div>
+
+        <section id="view-dashboard" class="max-w-6xl mx-auto space-y-6 block p-4 pb-20">
+            <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800 tracking-tight">Overview</h2>
+                    <p class="text-slate-500 mt-1" id="greeting-text">Welcome to your daily medical snapshot.</p>
+                </div>
+                <div class="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-slate-200 w-full md:w-auto">
+                    <i class="fa-solid fa-bolt text-amber-400 ml-2"></i>
+                    <input type="text" id="quick-task-input" placeholder="Quick add task for today..." class="border-none focus:ring-0 text-sm w-full md:w-64 outline-none px-2" onkeypress="if(event.key==='Enter') quickAddTask()">
+                    <button onclick="quickAddTask()" class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Master Task Progress -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 col-span-1 md:col-span-2 flex flex-col justify-center">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-list-check text-blue-500"></i> Semester Task Progress</h3>
+                    <div class="bg-slate-100 rounded-full h-5 w-full overflow-hidden mb-3 relative">
+                        <div id="master-progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-700 w-0"></div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <p id="master-progress-text" class="text-sm text-slate-500 font-medium">0 of 0 tasks completed</p>
+                        <p id="master-progress-pct" class="text-lg font-black text-slate-800">0%</p>
+                    </div>
+                </div>
+
+                <!-- Deep Work Analytics -->
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-2xl shadow-sm text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                    <i class="fa-solid fa-brain text-8xl absolute -right-4 -bottom-4 opacity-10"></i>
+                    <h3 class="font-medium opacity-90 text-sm">Deep Work</h3>
+                    <div class="text-4xl font-black mt-2 tracking-tighter" id="total-focus-time">0<span class="text-xl opacity-75 font-medium ml-1">m</span></div>
+                </div>
+
+                <!-- Standard Calculator -->
+                <div class="bg-slate-800 p-4 rounded-2xl shadow-sm text-white flex flex-col relative overflow-hidden">
+                    <div class="text-right text-2xl font-mono mb-2 h-8 overflow-hidden" id="calc-display">0</div>
+                    <div class="grid grid-cols-4 gap-1 flex-1">
+                        <button onclick="calcPress('C')" class="col-span-2 bg-rose-500 rounded font-bold hover:bg-rose-600 text-sm">C</button>
+                        <button onclick="calcPress('/')" class="bg-slate-600 rounded font-bold hover:bg-slate-500 text-sm">/</button>
+                        <button onclick="calcPress('*')" class="bg-slate-600 rounded font-bold hover:bg-slate-500 text-sm">×</button>
+                        <button onclick="calcPress('7')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm py-1">7</button>
+                        <button onclick="calcPress('8')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">8</button>
+                        <button onclick="calcPress('9')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">9</button>
+                        <button onclick="calcPress('-')" class="bg-slate-600 rounded font-bold hover:bg-slate-500 text-sm">-</button>
+                        <button onclick="calcPress('4')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm py-1">4</button>
+                        <button onclick="calcPress('5')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">5</button>
+                        <button onclick="calcPress('6')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">6</button>
+                        <button onclick="calcPress('+')" class="bg-slate-600 rounded font-bold hover:bg-slate-500 text-sm">+</button>
+                        <button onclick="calcPress('1')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm py-1">1</button>
+                        <button onclick="calcPress('2')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">2</button>
+                        <button onclick="calcPress('3')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">3</button>
+                        <button onclick="calcPress('=')" class="row-span-2 bg-blue-600 rounded font-bold hover:bg-blue-500 text-sm">=</button>
+                        <button onclick="calcPress('0')" class="col-span-2 bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm py-1">0</button>
+                        <button onclick="calcPress('.')" class="bg-slate-700 rounded font-bold hover:bg-slate-600 text-sm">.</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- All Tasks Overview -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col h-[400px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-indigo-500"></i> All Tasks Overview</h3>
+                        <button onclick="switchTab('triage')" class="text-xs text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded transition-colors">Full Triage &rarr;</button>
+                    </div>
+                    <div id="dash-tasks-list" class="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0"></div>
+                </div>
+
+                <!-- Upcoming Deadlines -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[400px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-hourglass-half text-rose-500"></i> High Priority & Quizzes</h3>
+                    </div>
+                    <div id="dash-deadlines-list" class="space-y-3 overflow-y-auto flex-1 pr-1 min-h-0"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-triage" class="max-w-5xl mx-auto hidden p-4 pb-20">
+            <header class="mb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800 tracking-tight">Triage Engine</h2>
+                    <p class="text-slate-500 mt-1">Prioritize tasks. High priority floats to the top.</p>
+                </div>
+                <div class="flex gap-2 bg-white p-2 border border-slate-200 rounded-xl shadow-sm">
+                    <select id="filter-subj" class="border-none bg-slate-50 text-sm rounded-lg p-2 focus:ring-0 outline-none font-medium text-slate-600" onchange="renderTriage()"><option value="All">All Subjects</option></select>
+                    <select id="filter-pri" class="border-none bg-slate-50 text-sm rounded-lg p-2 focus:ring-0 outline-none font-medium text-slate-600" onchange="renderTriage()">
+                        <option value="All">All Priorities</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>
+                    </select>
+                </div>
+            </header>
+            
+            <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 shrink-0">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <input type="text" id="task-name" placeholder="Task description..." class="col-span-1 md:col-span-2 lg:col-span-4 border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                    <select id="task-subject" class="border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"></select>
+                    <select id="task-type" class="border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="General Task">General Task</option><option value="Lecture">Lecture</option><option value="Study">Study</option>
+                        <option value="Long Quiz">Long Quiz</option><option value="Short Quiz">Short Quiz</option><option value="SGD">SGD</option><option value="Activity">Activity</option>
+                    </select>
+                    <select id="task-priority" class="border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="High">🚨 High Priority</option><option value="Medium" selected>⚡ Medium Priority</option><option value="Low">🧊 Low Priority</option>
+                    </select>
+                    <div class="flex gap-2">
+                        <input type="date" id="task-due" class="flex-1 border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+                        <input type="time" id="task-time" class="w-32 border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+                    </div>
+                    <textarea id="task-notes" placeholder="Other notes, instructions, or scope..." class="col-span-1 md:col-span-2 lg:col-span-4 border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none"></textarea>
+                </div>
+                <button onclick="addTask()" id="btn-add-task" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition-colors shadow-sm"><i class="fa-solid fa-plus mr-2"></i> Add Task to Triage</button>
+            </div>
+            <div id="triage-list" class="space-y-4 overflow-y-auto h-[calc(100vh-320px)] pr-2 pb-10"></div>
+        </section>
+
+        <section id="view-schedule" class="max-w-6xl mx-auto hidden h-full flex-col p-4 pb-20">
+            <header class="mb-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800 tracking-tight">Master Schedule</h2>
+                    <p class="text-slate-500 mt-1" id="cal-subtitle">Manage your academic and clinical timeline.</p>
+                </div>
+                <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 self-start md:self-auto">
+                    <button onclick="setScheduleView('daily')" id="btn-view-daily" class="px-4 py-1.5 rounded text-sm font-medium bg-white shadow-sm text-slate-800">Daily</button>
+                    <button onclick="setScheduleView('weekly')" id="btn-view-weekly" class="px-4 py-1.5 rounded text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Weekly</button>
+                    <button onclick="setScheduleView('monthly')" id="btn-view-monthly" class="px-4 py-1.5 rounded text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Monthly</button>
+                </div>
+            </header>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 shrink-0 mb-4 flex flex-wrap gap-3 items-center">
+                <input type="text" id="event-title" placeholder="Custom Event Title" class="flex-1 min-w-[150px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <input type="date" id="event-date" class="flex-1 min-w-[130px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <div class="flex items-center gap-1 border border-slate-300 rounded-lg px-2 bg-white focus-within:ring-2 focus-within:ring-indigo-500 flex-1 min-w-[100px]">
+                    <input type="time" id="event-time" class="border-none p-1.5 text-sm focus:outline-none bg-transparent w-full">
+                </div>
+                <select id="event-subj" class="flex-1 min-w-[120px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+                <button onclick="addScheduleEvent()" class="bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors shrink-0 w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div id="schedule-container" class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 overflow-y-auto min-h-0"></div>
+        </section>
+
+        <section id="view-study" class="max-w-6xl mx-auto hidden space-y-8 p-4 pb-20">
+            <header class="mb-6">
+                <h2 class="text-3xl font-black text-slate-800 tracking-tight">Study & Resources</h2>
+                <p class="text-slate-500 mt-1">Tools to maximize focus, retention, and grades.</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Pomodoro Timer -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+                    <h3 class="font-bold text-slate-700 mb-6 flex items-center gap-2"><i class="fa-solid fa-stopwatch text-indigo-500"></i> Pomodoro Focus</h3>
+                    <div id="timer-display" class="text-6xl font-black text-slate-800 tracking-tighter mb-6 font-mono">25:00</div>
+                    <div class="flex gap-2 mb-6">
+                        <button onclick="setTimer(25)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600">25m</button>
+                        <button onclick="setTimer(50)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600">50m</button>
+                        <button onclick="setTimer(5)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600">Break</button>
+                    </div>
+                    <div class="flex gap-3 w-full">
+                        <button onclick="toggleTimer()" id="btn-timer-toggle" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition-colors">Start</button>
+                        <button onclick="resetTimer()" class="px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-xl font-bold transition-colors"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Link Hub -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-link text-blue-500"></i> Resource Hub</h3>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="link-name" placeholder="Title" class="flex-1 min-w-[120px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <input type="url" id="link-url" placeholder="https://..." class="flex-[2] min-w-[150px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <button onclick="addLink()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shrink-0 w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="links-container" class="space-y-2 overflow-y-auto flex-1 min-h-[150px] pr-2"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Spaced Repetition Flashcards -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2"><i class="fa-regular fa-clone text-purple-500"></i> SRS Flashcards</h3>
+                        <span class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded" id="fc-due-count">0 Due</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="fc-front" placeholder="Question..." class="flex-1 min-w-[140px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                        <input type="text" id="fc-back" placeholder="Answer..." class="flex-1 min-w-[140px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                        <button onclick="addFC()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors shrink-0 w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 mb-3 w-max">
+                        <button onclick="setFCView('due')" id="btn-fc-due" class="px-3 py-1 rounded text-xs font-medium bg-white shadow-sm text-slate-800">Due Now</button>
+                        <button onclick="setFCView('all')" id="btn-fc-all" class="px-3 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors">All Cards</button>
+                    </div>
+                    <div id="flashcards-container" class="grid grid-cols-1 gap-3 overflow-y-auto p-1 flex-1 min-h-[250px] pr-2"></div>
+                </div>
+
+                <!-- Medical Mnemonics -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-lightbulb text-amber-500"></i> Mnemonics Library</h3>
+                    <div class="flex flex-col gap-2 mb-4">
+                        <input type="text" id="mn-acronym" placeholder="Acronym (e.g. CRAB)" class="border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold uppercase">
+                        <textarea id="mn-meaning" placeholder="Meaning / Breakdown..." class="border border-slate-300 p-2 rounded-lg text-sm h-16 resize-none focus:ring-2 focus:ring-amber-500 focus:outline-none"></textarea>
+                        <button onclick="addMnemonic()" class="bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-bold w-full transition-colors">Save Mnemonic</button>
+                    </div>
+                    <div id="mnemonics-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-[250px] pr-2"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Grades Tracker -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-line text-yellow-500"></i> Grades & Performance</h3>
+                    <div class="w-full h-32 mb-6 border-b border-l border-slate-200 flex items-end gap-2 px-2 pb-1 relative" id="grades-chart"></div>
+                    <div class="flex flex-wrap gap-2 mb-4 w-full items-center">
+                        <select id="grade-subj" class="flex-1 min-w-[120px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"></select>
+                        <input type="text" id="grade-name" placeholder="Exam Name" class="flex-[2] min-w-[140px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none">
+                        <div class="flex gap-2 flex-1 min-w-[140px]">
+                            <input type="number" id="grade-score" placeholder="Score" class="w-1/2 border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none min-w-0">
+                            <input type="number" id="grade-total" placeholder="Total" class="w-1/2 border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none min-w-0">
+                        </div>
+                        <button onclick="addGrade()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-bold shrink-0 shadow-sm transition-colors w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="grades-container" class="space-y-2 overflow-y-auto flex-1 max-h-[300px] pr-2"></div>
+                </div>
+
+                <!-- AI Prompts -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-robot text-emerald-500"></i> AI Prompt Library</h3>
+                    <div class="flex flex-col gap-2 mb-4">
+                        <input type="text" id="prompt-title" placeholder="Prompt Title (e.g. Simplify Patho)" class="border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <textarea id="prompt-text" placeholder="Type your detailed AI prompt here..." class="border border-slate-300 p-2 rounded-lg text-sm h-16 resize-none focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                        <button onclick="addPrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-bold w-full transition-colors">Save Prompt</button>
+                    </div>
+                    <div class="mb-3 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                        <input type="text" id="prompt-search" placeholder="Search prompts..." class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50" onkeyup="renderPrompts()">
+                    </div>
+                    <div id="prompts-container" class="space-y-3 overflow-y-auto flex-1 min-h-[300px] max-h-[400px] pr-2"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-finance" class="max-w-5xl mx-auto hidden p-0 md:p-4 pb-20 bg-cream md:rounded-3xl md:shadow-inner md:border md:border-gray-200">
+            <!-- Finance Header & Progress -->
+            <header class="sticky top-0 z-40 bg-cream/90 backdrop-blur-md pt-5 pb-4 px-5 border-b border-gray-200/50 shadow-sm md:rounded-t-3xl">
+                <div class="flex justify-between items-end mb-3">
+                    <div>
+                        <h2 class="text-2xl font-black text-emerald-700 tracking-tight flex items-center gap-2">
+                            <span class="bg-emerald-100 text-emerald-600 p-1.5 rounded-lg"><i class="fa-solid fa-wallet text-sm"></i></span>
+                            Finance & Treasurer
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1">Manage net worth, debts, and academic collections.</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-indigo-500 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full" id="progress-percentage">0%</span>
+                    </div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div id="progress-bar" class="bg-mint h-1.5 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+                </div>
+            </header>
+
+            <!-- Net Worth Card -->
+            <div class="px-5 pt-5 pb-2">
+                <div class="bg-gradient-to-br from-nw-light to-nw-dark rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                    <div class="wave-bg"></div>
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div class="flex items-center gap-2 mb-1"><i class="fa-solid fa-scale-balanced text-indigo-200"></i><p class="text-indigo-100 text-sm font-medium">Net Worth</p></div>
+                        <h2 class="text-4xl font-bold tracking-tight" id="net-worth">₱0.00</h2>
+                        <div class="w-full flex justify-between mt-6 pt-4 border-t border-indigo-400/30">
+                            <div class="text-center w-1/2 border-r border-indigo-400/30"><p class="text-indigo-200 text-xs mb-0.5">Assets</p><p class="font-semibold text-base" id="total-assets">₱0.00</p></div>
+                            <div class="text-center w-1/2"><p class="text-indigo-200 text-xs mb-0.5">Liabilities</p><p class="font-semibold text-base" id="total-liabilities">₱0.00</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Borrowed & Stashes Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 pt-4">
+                <!-- Borrowed (Liabilities) -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-semibold text-indigo-900 flex items-center gap-1.5">Borrowed <span class="bg-gray-100 text-gray-400 text-[9px] px-1.5 py-0.5 rounded font-medium uppercase">Tap to edit</span></h3>
+                        <span class="text-sm font-bold text-rose-500" id="header-borrowed-total">₱0.00</span>
+                    </div>
+                    <div class="flex gap-3 overflow-x-auto pb-2 snap-x no-scrollbar">
+                        <div onclick="openDebtEditModal('gLoan')" class="cursor-pointer min-w-[130px] bg-white rounded-xl p-3 shadow-sm border border-gray-100 snap-start flex-shrink-0 hover:border-blue-300 transition-colors">
+                            <div class="flex items-center gap-2 mb-2"><div class="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center text-white font-bold text-[10px]">G</div><span class="text-xs font-bold text-slate-700">GLoan</span></div>
+                            <div class="text-sm font-black text-dark" id="debt-gloan">₱0.00</div>
+                        </div>
+                        <div onclick="openDebtEditModal('mariBank')" class="cursor-pointer min-w-[140px] bg-white rounded-xl p-3 shadow-sm border border-gray-100 snap-start flex-shrink-0 hover:border-orange-300 transition-colors">
+                            <div class="flex items-center gap-2 mb-2"><div class="w-6 h-6 rounded-md bg-orange-500 flex items-center justify-center text-white font-bold text-[10px]">M</div><span class="text-xs font-bold text-slate-700">Maribank</span></div>
+                            <div class="text-sm font-black text-dark" id="debt-maribank">₱0.00</div>
+                        </div>
+                        <div onclick="openDebtEditModal('atome')" class="cursor-pointer min-w-[130px] bg-white rounded-xl p-3 shadow-sm border border-gray-100 snap-start flex-shrink-0 opacity-80 hover:border-yellow-300 transition-colors">
+                            <div class="flex items-center gap-2 mb-2"><div class="w-6 h-6 rounded-md bg-yellow-400 flex items-center justify-center text-black font-bold text-[10px]">A</div><span class="text-xs font-bold text-slate-700">Atome</span></div>
+                            <div class="text-sm font-black text-dark" id="debt-atome">₱0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Debit Stashes -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-semibold text-indigo-900 flex items-center gap-1.5">Debit Stashes <span class="bg-gray-100 text-gray-400 text-[9px] px-1.5 py-0.5 rounded font-medium uppercase">Tap to edit</span></h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-bold text-emerald-500" id="header-assets-total">Bal. ₱0.00</span>
+                            <button onclick="openTransferModal()" class="w-7 h-7 rounded-full bg-amber-400 text-white flex items-center justify-center hover:bg-amber-500 shadow-sm transition-colors" title="Transfer between accounts"><i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i></button>
+                            <button onclick="openExpenseModal()" class="w-7 h-7 rounded-full bg-rose-400 text-white flex items-center justify-center hover:bg-rose-500 shadow-sm transition-colors" title="Log Expense"><i class="fa-solid fa-minus text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                        <div onclick="openStashEditModal('cash')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm mb-2 shadow-sm"><i class="fa-solid fa-dollar-sign"></i></div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[CASH] SPENDING</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-cash">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('mbSpending')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm mb-2 shadow-sm"><i class="fa-solid fa-m"></i></div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[MARIBANK] SPENDING</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-mbSpending">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('gcash')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center text-sm mb-2 shadow-sm"><i class="fa-solid fa-g"></i></div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[GCASH] SPENDING</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-gcash">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('mariBank')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center text-[10px] font-bold mb-2 shadow-sm">GT</div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[GOTYME] MARIBANK</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-maribank">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('gLoan')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center text-[10px] font-bold mb-2 shadow-sm">GT</div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[GOTYME] GLOAN</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-gloan">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('savings')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center text-[10px] font-bold mb-2 shadow-sm">GT</div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[GOTYME] SAVINGS</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-savings">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('atome')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-cyan-400 text-white flex items-center justify-center text-[10px] font-bold mb-2 shadow-sm">GT</div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[GOTYME] ATOME</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-atome">₱0.00</div>
+                        </div>
+                        <div onclick="openStashEditModal('rcbc')" class="cursor-pointer bg-[#FDFDF9] rounded-2xl p-3 shadow-sm border border-gray-100 hover:border-cyan-300 transition-colors flex flex-col justify-between min-h-[110px]">
+                            <div><div class="w-8 h-8 rounded-full bg-[#4a72b8] text-white flex items-center justify-center text-sm mb-2 shadow-sm"><i class="fa-solid fa-building-columns"></i></div><div class="text-[8px] font-black text-slate-800 uppercase leading-tight">[INVESTING] RCBC</div></div>
+                            <div class="text-sm font-black text-dark mt-2" id="stash-rcbc">₱0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Savings Projection Goal Card -->
+            <div class="px-5 pt-4 pb-4 border-b border-gray-200/50">
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Foreseen Savings</p>
+                        <p class="text-[10px] text-emerald-500 mb-1">Projected balance end of roadmap</p>
+                        <p class="text-2xl font-black text-emerald-900" id="projected-savings">₱0.00</p>
+                    </div>
+                    <div class="h-14 w-14 bg-emerald-200/50 rounded-full flex items-center justify-center text-emerald-600 shadow-inner">
+                        <i class="fa-solid fa-piggy-bank text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions Section -->
+            <div class="px-5 pt-6 pb-2 border-b border-gray-200/50">
+                <h3 class="text-base font-bold text-indigo-900 mb-4 flex items-center"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Recent Transactions</h3>
+                <div id="transactions-list" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+            </div>
+
+            <!-- Weekly Checklist Section -->
+            <div class="px-5 pt-6 pb-6">
+                <h3 class="text-base font-bold text-indigo-900 mb-4 flex items-center justify-between">
+                    <span><i class="fa-solid fa-map-location-dot mr-2"></i>Weekly Roadmap</span>
+                    <button onclick="resetFinanceData()" class="text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg transition-colors font-bold shadow-sm">Reset Roadmap</button>
+                </h3>
+                <div id="weeks-container" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <section id="view-treasurer" class="max-w-5xl mx-auto hidden p-4 pb-20 space-y-6">
+            <header class="mb-4">
+                <h2 class="text-3xl font-black text-amber-600 tracking-tight flex items-center gap-2"><i class="fa-solid fa-sack-dollar"></i> Class Treasurer</h2>
+                <p class="text-slate-500 mt-1">Manage class funds, collections, and financial tasks safely away from personal data.</p>
+            </header>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-base font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-users text-blue-500"></i> Class Fund Collection</h3>
+                <div class="flex flex-col md:flex-row gap-3 mb-6">
+                    <input type="text" id="fin-task-name" placeholder="e.g. Collect Book Fees..." class="flex-1 border border-slate-300 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold">
+                    <input type="date" id="fin-task-due" class="w-full md:w-auto border border-slate-300 p-3 rounded-xl text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <button onclick="addFinTask()" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-sm">Add Action Item</button>
+                </div>
+                <div id="fin-task-list" class="space-y-3 overflow-y-auto max-h-[500px] pr-2"></div>
+            </div>
+        </section>
+
+        <section id="view-wellness" class="max-w-6xl mx-auto hidden p-4 pb-20 space-y-6">
+            <header class="mb-4">
+                <h2 class="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2"><i class="fa-solid fa-heart-pulse text-teal-500"></i> Wellness Hub</h2>
+                <p class="text-slate-500 mt-1">Protect your peace. Track sleep, mood, and life outside of medicine.</p>
+            </header>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Daily Log & Burnout Meter -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col h-[500px]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-seedling text-emerald-500"></i> Daily Check-in & Logs</h3>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100 items-center">
+                        <input type="date" id="well-date" class="flex-1 min-w-[130px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                        <select id="well-mood" class="flex-1 min-w-[110px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                            <option value="5">🤩 Great</option><option value="4">🙂 Good</option><option value="3">😐 Okay</option><option value="2">😮‍💨 Tired</option><option value="1">🫠 Burned Out</option>
+                        </select>
+                        <input type="number" id="well-sleep" placeholder="Sleep (hrs)" class="flex-1 min-w-[100px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" min="0" max="24">
+                        <input type="text" id="well-note" placeholder="Brief reflection..." class="flex-[3] min-w-[180px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                        <button onclick="addWellnessLog()" class="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg font-bold shadow-sm transition-colors shrink-0 w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="wellness-list" class="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0"></div>
+                </div>
+
+                <!-- Life Outside Med -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
+                    <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-mug-hot text-amber-500"></i> Life Outside Med</h3>
+                    <p class="text-xs text-slate-500 mb-4">Non-academic tasks to keep you grounded.</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <input type="text" id="nonmed-task" placeholder="e.g., Call mom, workout..." class="flex-1 min-w-[150px] border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none" onkeypress="if(event.key==='Enter') addNonMedTask()">
+                        <button onclick="addNonMedTask()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors shrink-0 w-full sm:w-auto"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="nonmed-list" class="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-settings" class="max-w-5xl mx-auto hidden p-4 pb-20 space-y-6">
+            <header class="mb-6">
+                <h2 class="text-3xl font-black text-slate-800 tracking-tight">Settings & Academics</h2>
+                <p class="text-slate-500 mt-1">Manage your profile, subjects, and recurring schedules.</p>
+            </header>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-rose-500"></i> Account & Security</h3>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl gap-4">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Logged In As</p>
+                        <p class="font-bold text-slate-800 truncate" id="account-email-display">Not Logged In</p>
+                    </div>
+                    <button onclick="logoutUser()" id="btn-logout-settings" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 hidden shrink-0 w-full sm:w-auto"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-user-graduate text-blue-500"></i> Academic Profile</h3>
+                    <div class="space-y-4">
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1">Current Year Level</label><select id="set-year" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="saveProfileSettings()"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3" selected>3rd Year</option><option value="4">4th Year / Clerkship</option></select></div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1">Current Semester</label><select id="set-sem" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="saveProfileSettings()"><option value="1" selected>1st Semester</option><option value="2">2nd Semester</option></select></div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Template Validity (Start - End)</label>
+                            <div class="flex flex-col gap-2">
+                                <input type="date" id="set-valid-from" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-600" onchange="saveProfileSettings()">
+                                <input type="date" id="set-valid-until" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-600" onchange="saveProfileSettings()">
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">Recurring classes only show within these dates.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col max-h-[400px]">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-tags text-indigo-500"></i> Subject Manager</h3>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="new-subj-name" placeholder="Subject Name" class="flex-1 min-w-0 border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <button onclick="addSubject()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-lg font-bold shrink-0"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="subjects-list" class="flex-1 overflow-y-auto space-y-2 pr-2"></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-week text-purple-500"></i> Weekly Class Template</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-6 bg-slate-50 p-3 rounded-xl border border-slate-200 items-center">
+                    <select id="tpl-day" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                        <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+                        <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+                    </select>
+                    <input type="time" id="tpl-time" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                    <select id="tpl-subj" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"></select>
+                    <input type="text" id="tpl-title" placeholder="Class Title / Room" class="w-full border border-slate-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none min-w-0">
+                    <button onclick="addTemplateClass()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold shadow-sm"><i class="fa-solid fa-plus"></i> Add</button>
+                </div>
+                <div id="template-classes-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+            </div>
+        </section>
+
+        <!-- Finance Modals -->
+        <div id="edit-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
+            <div id="modal-content" class="modal-box bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl transform scale-95">
+                <h3 class="text-lg font-bold text-dark mb-1">Edit Week <span id="modal-week-num"></span> Deposits</h3>
+                <p class="text-xs text-slate-500 mb-4">Values cannot be lower than planned baseline (except Atome & Savings).</p>
+                <div class="space-y-4">
+                    <div><label class="block text-xs font-semibold text-slate-700 mb-1">MariBank (Min: ₱<span id="min-mb"></span>)</label><div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-mb" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div></div>
+                    <div><label class="block text-xs font-semibold text-slate-700 mb-1">Atome (Min: ₱0)</label><div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-at" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div></div>
+                    <div><label class="block text-xs font-semibold text-slate-700 mb-1">GLoan (Min: ₱<span id="min-gl"></span>)</label><div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-gl" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div></div>
+                    <div><label class="block text-xs font-semibold text-slate-700 mb-1">Savings (Min: ₱0)</label><div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-sv" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div></div>
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button onclick="closeEditModal()" class="flex-1 py-2.5 bg-gray-100 text-slate-700 rounded-xl font-medium text-sm">Cancel</button>
+                    <button onclick="saveEditModal()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm shadow-sm">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="debt-edit-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
+            <div id="debt-modal-content" class="modal-box bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl transform scale-95">
+                <h3 class="text-lg font-bold text-dark mb-1" id="debt-modal-title">Edit Debt</h3>
+                <p class="text-xs text-slate-500 mb-4">Update the current base amount owed.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Current Balance</label>
+                        <div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-debt-val" step="0.01" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div>
+                    </div>
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button onclick="closeDebtModal()" class="flex-1 py-2.5 bg-gray-100 text-slate-700 rounded-xl font-medium text-sm">Cancel</button>
+                    <button onclick="saveDebtModal()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm shadow-sm">Update</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="stash-edit-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
+            <div id="stash-modal-content" class="modal-box bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl transform scale-95">
+                <h3 class="text-lg font-bold text-dark mb-1" id="stash-modal-title">Edit Stash</h3>
+                <p class="text-xs text-slate-500 mb-4">Update the initial base balance of this stash.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Base Balance</label>
+                        <div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-stash-val" step="0.01" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div>
+                    </div>
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button onclick="closeStashModal()" class="flex-1 py-2.5 bg-gray-100 text-slate-700 rounded-xl font-medium text-sm">Cancel</button>
+                    <button onclick="saveStashModal()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm shadow-sm">Update</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Modal -->
+        <div id="transfer-modal" class="modal-overlay fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
+            <div id="transfer-modal-content" class="modal-box bg-white rounded-t-3xl md:rounded-3xl p-6 w-full md:w-[90%] max-w-md shadow-2xl transform translate-y-full md:translate-y-0 md:scale-95 absolute md:relative transition-all duration-300">
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="closeTransferModal()" class="text-slate-400 hover:text-dark transition-colors"><i class="fa-solid fa-xmark text-2xl"></i></button>
+                    <h3 class="text-xl font-black text-dark flex-1 text-center pr-6">Transfer Funds</h3>
+                </div>
+                <div class="flex items-center justify-between gap-3 mb-8">
+                    <div class="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 relative hover:border-amber-300 transition-colors focus-within:ring-2 focus-within:ring-amber-200">
+                        <label class="block text-[10px] font-bold text-slate-400 text-center uppercase mb-1">From</label>
+                        <select id="transfer-from" class="w-full bg-transparent text-sm font-bold text-indigo-900 text-center outline-none cursor-pointer">
+                            <option value="cash">[CASH] SPENDING</option>
+                            <option value="mbSpending" selected>[MARIBANK] SPENDING</option>
+                            <option value="gcash">[GCASH] SPENDING</option>
+                            <option value="mariBank">[GOTYME] MARIBANK</option>
+                            <option value="gLoan">[GOTYME] GLOAN</option>
+                            <option value="savings">[GOTYME] SAVINGS</option>
+                            <option value="atome">[GOTYME] ATOME</option>
+                            <option value="rcbc">[INVESTING] RCBC</option>
+                        </select>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center shrink-0 shadow-inner z-10 -mx-3"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                    <div class="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 relative hover:border-amber-300 transition-colors focus-within:ring-2 focus-within:ring-amber-200">
+                        <label class="block text-[10px] font-bold text-slate-400 text-center uppercase mb-1">To</label>
+                        <select id="transfer-to" class="w-full bg-transparent text-sm font-bold text-indigo-900 text-center outline-none cursor-pointer">
+                            <option value="cash">[CASH] SPENDING</option>
+                            <option value="mbSpending">[MARIBANK] SPENDING</option>
+                            <option value="gcash">[GCASH] SPENDING</option>
+                            <option value="mariBank">[GOTYME] MARIBANK</option>
+                            <option value="gLoan">[GOTYME] GLOAN</option>
+                            <option value="savings" selected>[GOTYME] SAVINGS</option>
+                            <option value="atome">[GOTYME] ATOME</option>
+                            <option value="rcbc">[INVESTING] RCBC</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="space-y-5 mb-8">
+                    <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                        <span class="text-base font-bold text-indigo-900">Amount</span>
+                        <input type="number" id="transfer-amount" placeholder="0" class="text-right font-black text-2xl text-dark outline-none w-1/2 bg-transparent focus:text-amber-600 transition-colors">
+                    </div>
+                     <div class="flex justify-between items-center pb-3">
+                        <span class="text-base font-bold text-indigo-900">Date</span>
+                        <span class="font-bold text-sm bg-gray-100 px-3 py-1 rounded-full text-dark" id="transfer-date"></span>
+                    </div>
+                </div>
+                <button onclick="executeTransfer()" class="w-full py-4 bg-amber-400 hover:bg-amber-500 text-dark rounded-full font-bold text-lg shadow-sm transition-colors">Confirm Transfer</button>
+            </div>
+        </div>
+
+        <!-- Expense Modal -->
+        <div id="expense-modal" class="modal-overlay fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
+            <div id="expense-modal-content" class="modal-box bg-white rounded-t-3xl md:rounded-3xl p-6 w-full md:w-[90%] max-w-md shadow-2xl transform translate-y-full md:translate-y-0 md:scale-95 absolute md:relative transition-all duration-300">
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="closeExpenseModal()" class="text-slate-400 hover:text-dark transition-colors"><i class="fa-solid fa-xmark text-2xl"></i></button>
+                    <h3 class="text-xl font-black text-dark flex-1 text-center pr-6">Log Expense</h3>
+                </div>
+                <!-- Amount Input -->
+                <div class="flex justify-center items-center mb-6 border-b border-gray-100 pb-6">
+                    <span class="text-4xl font-black text-slate-300 mr-1 mt-1">₱</span>
+                    <input type="number" id="expense-amount" placeholder="0" class="text-6xl font-black text-dark w-full text-center outline-none bg-transparent focus:text-rose-500 transition-colors placeholder-slate-200">
+                </div>
+                <!-- Categories -->
+                <div class="grid grid-cols-3 gap-2 mb-6" id="expense-categories"></div>
+                <!-- Account Selector -->
+                <div class="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-2xl p-4 relative hover:border-rose-300 transition-colors mb-6">
+                    <div class="flex-1">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pay From</label>
+                        <select id="expense-account" class="w-full bg-transparent text-sm font-bold text-indigo-900 outline-none cursor-pointer">
+                            <option value="cash">[CASH] SPENDING</option>
+                            <option value="mbSpending">[MARIBANK] SPENDING</option>
+                            <option value="gcash">[GCASH] SPENDING</option>
+                            <option value="mariBank">[GOTYME] MARIBANK</option>
+                            <option value="gLoan">[GOTYME] GLOAN</option>
+                            <option value="savings" selected>[GOTYME] SAVINGS</option>
+                            <option value="atome">[GOTYME] ATOME</option>
+                        </select>
+                    </div>
+                    <div class="text-right ml-4 shrink-0">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Date</label>
+                        <div class="text-sm font-bold text-slate-700" id="expense-date"></div>
+                    </div>
+                </div>
+                <button onclick="executeExpense()" class="w-full py-4 bg-rose-400 hover:bg-rose-500 text-white rounded-full font-bold text-lg shadow-sm transition-colors">Confirm Expense</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged, signInWithCustomToken, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Configuration from Platform (with fallbacks)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'medportal_merged_v1';
+        const fbConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDYDpwxoNT2_3L-FILmcA9pWPwIc67Aod0", 
+            authDomain: "medicinezoila.firebaseapp.com",
+            projectId: "medicinezoila", 
+            storageBucket: "medicinezoila.firebasestorage.app",
+            messagingSenderId: "84305067732", 
+            appId: "1:84305067732:web:ff76e6543d28da13994541"
+        };
+
+        const app = initializeApp(fbConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let fbDocRef = null;
+        let unsubscribeFB = null;
+
+        // Constants for Finance Module
+        const initialBalances = { cash: 500, mbSpending: 698.44, gcash: 5.12, mariBank: 315.84, gLoan: 1.14, savings: 2542.00, atome: 0.00, rcbc: 1371.86 };
+        const initialDebts = { mariBank: 22910.63, gLoan: 6633.06, atome: 0.00 };
+        const weeklyData = [
+            { week: 1, date: "Jul 20-26", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "Atome (Jul 20)", billAmt: 1597, payFrom: "savings", status: "Paid" },
+            { week: 2, date: "Jul 27-Aug 2", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 3, date: "Aug 3-9", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 4, date: "Aug 10-16", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "MariBank", billAmt: 3187, payFrom: "mariBank", status: "Pending" },
+            { week: 5, date: "Aug 17-23", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "Atome", billAmt: 1600, payFrom: "atome", status: "Pending" },
+            { week: 6, date: "Aug 24-30", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 7, date: "Aug 31-Sep 6", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 8, date: "Sep 7-13", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "MariBank", billAmt: 3187, payFrom: "mariBank", status: "Pending" },
+            { week: 9, date: "Sep 14-20", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "Atome", billAmt: 1600, payFrom: "atome", status: "Pending" },
+            { week: 10, date: "Sep 21-27", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 11, date: "Sep 28-Oct 4", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 12, date: "Oct 5-11", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 13, date: "Oct 12-18", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "MariBank", billAmt: 3187, payFrom: "mariBank", status: "Pending" },
+            { week: 14, date: "Oct 19-25", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "Atome & GLoan", billAmt: 2877.77, payFrom: "atome_gloan", status: "Pending" },
+            { week: 15, date: "Oct 26-Nov 1", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 16, date: "Nov 2-8", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 17, date: "Nov 9-15", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "MariBank", billAmt: 3187, payFrom: "mariBank", status: "Pending" },
+            { week: 18, date: "Nov 16-22", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "Atome", billAmt: 1600, payFrom: "atome", status: "Pending" },
+            { week: 19, date: "Nov 23-29", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "GLoan", billAmt: 2877.77, payFrom: "gLoan", status: "Pending" },
+            { week: 20, date: "Nov 30-Dec 6", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 21, date: "Dec 7-13", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "MariBank", billAmt: 3187, payFrom: "mariBank", status: "Pending" },
+            { week: 22, date: "Dec 14-20", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 0, billType: "Atome", billAmt: 1600, payFrom: "atome", status: "Pending" },
+            { week: 23, date: "Dec 21-27", lifestyle: 400, depMB: 800, depAT: 400, depGL: 300, depSV: 1000, billType: "GLoan", billAmt: 2877.73, payFrom: "gLoan", status: "Pending" },
+            { week: 24, date: "Dec 28-Jan 3", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 25, date: "Jan 4-10", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 26, date: "Jan 11-17", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 1100, billType: "MariBank", billAmt: 2324.37, payFrom: "mariBank", status: "Pending" },
+            { week: 27, date: "Jan 18-24", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "Atome", billAmt: 3200, payFrom: "atome", status: "Pending" },
+            { week: 28, date: "Jan 25-31", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 29, date: "Feb 1-7", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 30, date: "Feb 8-14", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 1100, billType: "MariBank", billAmt: 2324.37, payFrom: "mariBank", status: "Pending" },
+            { week: 31, date: "Feb 15-21", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "Atome", billAmt: 3200, payFrom: "atome", status: "Pending" },
+            { week: 32, date: "Feb 22-28", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 33, date: "Mar 1-7", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 100, billType: "None", billAmt: 0, payFrom: "None", status: "Pending" },
+            { week: 34, date: "Mar 8-14", lifestyle: 800, depMB: 600, depAT: 800, depGL: 0, depSV: 1100, billType: "MariBank", billAmt: 2324.37, payFrom: "mariBank", status: "Pending" }
+        ];
+
+        // Global State Defaults
+        const defaultLinks = [
+            {id: 'l1', title: 'Batch GDrive', url: 'https://drive.google.com/drive/folders/1qYGUitriEiHO5cLmeK4Cw7Dyg-ZIST8k'},
+            {id: 'l2', title: 'Trans Tracker', url: 'https://docs.google.com/spreadsheets/d/1a0Yv_T3nUkGNxrPx7Ye2WXn5RxQla94GGcyvXIb9pWM/edit'}
+        ];
+
+        const colorPalette = [
+            'bg-blue-100 text-blue-800 border-blue-200', 'bg-red-100 text-red-800 border-red-200', 'bg-purple-100 text-purple-800 border-purple-200', 
+            'bg-pink-100 text-pink-800 border-pink-200', 'bg-sky-100 text-sky-800 border-sky-200', 'bg-green-100 text-green-800 border-green-200',
+            'bg-orange-100 text-orange-800 border-orange-200', 'bg-yellow-100 text-yellow-800 border-yellow-200', 'bg-rose-100 text-rose-800 border-rose-200', 
+            'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200', 'bg-teal-100 text-teal-800 border-teal-200', 'bg-indigo-100 text-indigo-800 border-indigo-200'
+        ];
+
+        const defaultSubjects = [
+            {name: 'General', color: 'bg-slate-100 text-slate-800 border-slate-200'}, {name: 'Medicine II', color: colorPalette[0]},
+            {name: 'Surgery II', color: colorPalette[1]}, {name: 'Pediatrics II', color: colorPalette[2]}, {name: 'Obstetrics', color: colorPalette[3]},
+            {name: 'Radiology', color: colorPalette[4]}, {name: 'Behavioral Med', color: colorPalette[5]}, {name: 'Otorhinolaryngology', color: colorPalette[6]},
+            {name: 'Bioethics III', color: colorPalette[7]}, {name: 'TCM', color: colorPalette[8]}, {name: 'Orthopedic Surg', color: colorPalette[9]},
+            {name: 'Pedia Surgery', color: colorPalette[10]}, {name: 'Rehab Med', color: colorPalette[11]}
+        ];
+
+        const base3rdYear1stSem = {
+            "1": [ {id:'b1', time: '07:00', title: 'Medicine II', subj: 'Medicine II'}, {id:'b2', time: '13:00', title: 'Surgery II', subj: 'Surgery II'}, {id:'b3', time: '15:00', title: 'Orthopedic Surgery (Q1)', subj: 'Orthopedic Surg'} ],
+            "2": [ {id:'b4', time: '07:00', title: 'Pediatrics II', subj: 'Pediatrics II'}, {id:'b5', time: '10:00', title: 'Behavioral Medicine II', subj: 'Behavioral Med'}, {id:'b6', time: '13:00', title: 'Pediatrics II (Clinical Correlates)', subj: 'Pediatrics II'}, {id:'b7', time: '15:00', title: 'Bioethics III', subj: 'Bioethics III'} ],
+            "3": [ {id:'b8', time: '08:00', title: 'Radiology', subj: 'Radiology'}, {id:'b9', time: '13:00', title: 'Otorhinolaryngology', subj: 'Otorhinolaryngology'} ],
+            "4": [ {id:'b10', time: '07:00', title: 'Obstetrics', subj: 'Obstetrics'}, {id:'b11', time: '10:00', title: 'TCM', subj: 'TCM'}, {id:'b12', time: '13:00', title: 'Surgery II', subj: 'Surgery II'}, {id:'b13', time: '15:00', title: 'TCM', subj: 'TCM'} ],
+            "5": [ {id:'b14', time: '07:00', title: 'Medicine II', subj: 'Medicine II'}, {id:'b15', time: '13:00', title: 'Pedia Surgery (Q1)', subj: 'Pedia Surgery'}, {id:'b16', time: '15:00', title: 'Rehab Medicine (Q1)', subj: 'Rehab Med'} ]
+        };
+
+        window.state = {
+            tasks: [], schedule: [], finTasks: [], flashcards: [], prompts: [], grades: [], mnemonics: [], links: [...defaultLinks], 
+            totalFocusMins: 0, scratchpad: "", subjects: [...defaultSubjects], wellnessLogs: [], nonMedTasks: [],
+            acadProfile: { year: "3", sem: "1", active: true, validFrom: "2026-08-01", validUntil: "2026-12-20", schedule: {} },
+            finance: { completedWeeks: [], customDeposits: {}, debts: { ...initialDebts }, baseStashes: { ...initialBalances } } // Merged Finance State
+        };
+
+        const typeColors = {
+            'Study': 'bg-indigo-100 text-indigo-800 border-indigo-200', 'Long Quiz': 'bg-orange-100 text-orange-800 border-orange-200',
+            'Short Quiz': 'bg-amber-100 text-amber-800 border-amber-200', 'SGD': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+            'Activity': 'bg-lime-100 text-lime-800 border-lime-200', 'Lecture': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            'General Task': 'bg-slate-100 text-slate-800 border-slate-200'
+        };
+
+        window.showToast = function(msg, isErr=false) {
+            const t = document.getElementById('toast');
+            t.innerHTML = isErr ? `<i class="fa-solid fa-circle-exclamation text-rose-400"></i> <span>${msg}</span>` 
+                                : `<i class="fa-solid fa-circle-check text-emerald-400"></i> <span>${msg}</span>`;
+            t.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3000);
+        };
+
+        window.fallbackCopyTextToClipboard = function(text) {
+            const textArea = document.createElement("textarea"); textArea.value = text;
+            textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed";
+            document.body.appendChild(textArea); textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); window.showToast("Copied to clipboard!"); } 
+            catch (err) { window.showToast("Failed to copy", true); }
+            document.body.removeChild(textArea);
+        };
+
+        function toLocalDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function getSubjStyle(name) { const s = (window.state.subjects || []).find(x => x.name === name); return s ? s.color : 'bg-slate-100 text-slate-800 border-slate-200'; }
+        
+        // Strict Firebase Path Auth Flow
+        async function handleAuth() {
+            // 1. Force local persistence so sessions survive page reloads
+            try {
+                await setPersistence(auth, browserLocalPersistence);
+            } catch (err) {
+                console.warn("Persistence error:", err);
+            }
+
+            // 2. Always register the listener first so it can react to any successful login
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    
+                    // Reset loading state for future logouts
+                    const authLoading = document.getElementById('auth-loading');
+                    const authForm = document.getElementById('auth-form-container');
+                    if(authLoading) authLoading.classList.remove('hidden');
+                    if(authForm) authForm.classList.add('hidden');
+
+                    const emailDisplay = document.getElementById('account-email-display');
+                    if(emailDisplay) emailDisplay.innerText = user.isAnonymous ? "Anonymous User (Local Device)" : user.email;
+                    document.getElementById('btn-logout-settings').classList.remove('hidden');
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-400"></i> Syncing...';
+                    
+                    // STRICT PATH RULE COMPLIANCE
+                    fbDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'main');
+                    
+                    if(unsubscribeFB) unsubscribeFB();
+                    unsubscribeFB = onSnapshot(fbDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            window.state = { ...window.state, ...data };
+                            if(!window.state.finance) {
+                                window.state.finance = { completedWeeks: weeklyData.filter(w=>w.status==="Paid").map(w=>w.week), customDeposits: {}, debts: { ...initialDebts }, baseStashes: { ...initialBalances } };
+                            }
+                            if(!window.state.finance.baseStashes) {
+                                window.state.finance.baseStashes = { ...initialBalances };
+                            } else {
+                                ['cash', 'mbSpending', 'gcash', 'rcbc'].forEach(k => {
+                                    if(window.state.finance.baseStashes[k] === undefined) window.state.finance.baseStashes[k] = initialBalances[k];
+                                });
+                            }
+                            if(!window.state.finTasks) window.state.finTasks = []; // Ensure Treasurer tasks array exists
+                            
+                            // Auto-inject missing subjects into user state
+                            if(!window.state.subjects) window.state.subjects = [];
+                            defaultSubjects.forEach(ds => {
+                                if(!window.state.subjects.find(s => s.name === ds.name)) window.state.subjects.push(ds);
+                            });
+                            
+                        } else { window.saveState(); }
+                        document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud text-emerald-500"></i> Live';
+                        populateSubjectDropdowns(); renderAll();
+                    }, (error) => { console.warn("Snapshot error:", error); });
+                } else {
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                    
+                    // Hide loading spinner and show the actual login form
+                    const authLoading = document.getElementById('auth-loading');
+                    const authForm = document.getElementById('auth-form-container');
+                    if(authLoading) authLoading.classList.add('hidden');
+                    if(authForm) authForm.classList.remove('hidden');
+
+                    document.getElementById('btn-logout-settings').classList.add('hidden');
+                }
+            });
+
+            // 3. Attempt the custom token injection. If it fails, warn instead of throwing a system error.
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try { 
+                    await signInWithCustomToken(auth, __initial_auth_token); 
+                } catch (e) { 
+                    console.warn("Custom token auth skipped or failed:", e.message); 
+                }
+            }
+        }
+        handleAuth();
+
+        window.loginUser = async function() {
+            const e = document.getElementById('auth-email').value; const p = document.getElementById('auth-password').value;
+            const err = document.getElementById('auth-error'); const btn = document.getElementById('btn-login');
+            err.classList.add('hidden'); if(!e || !p) { err.innerText = "Enter email and password."; err.classList.remove('hidden'); return; }
+            try { btn.innerText = "Connecting..."; await signInWithEmailAndPassword(auth, e, p); btn.innerText = "Log In"; } 
+            catch (error) { btn.innerText = "Log In"; err.innerText = error.message; err.classList.remove('hidden'); }
+        };
+
+        window.registerUser = async function() {
+            const e = document.getElementById('auth-email').value; const p = document.getElementById('auth-password').value;
+            const err = document.getElementById('auth-error'); err.classList.add('hidden');
+            if(!e || !p) { err.innerText = "Enter email and password."; err.classList.remove('hidden'); return; }
+            try { await createUserWithEmailAndPassword(auth, e, p); } catch (error) { err.innerText = error.message; err.classList.remove('hidden'); }
+        };
+        
+        window.loginAnonymously = async function() {
+            const err = document.getElementById('auth-error'); err.classList.add('hidden');
+            try { await signInAnonymously(auth); } catch (error) { err.innerText = "Failed: " + error.message; err.classList.remove('hidden'); }
+        };
+        window.logoutUser = function() { signOut(auth); };
+
+        window.saveState = function() {
+            if (fbDocRef) {
+                document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin text-blue-400"></i> Saving...';
+                setDoc(fbDocRef, window.state).then(() => {
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud text-emerald-500"></i> Live';
+                }).catch(e => { document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-triangle-exclamation text-red-500"></i> Error'; });
+            }
+            renderAll();
+        };
+
+        window.switchTab = function(tabId) {
+            ['dashboard', 'triage', 'schedule', 'study', 'wellness', 'finance', 'treasurer', 'settings'].forEach(t => {
+                const view = document.getElementById(`view-${t}`); const tab = document.getElementById(`tab-${t}`);
+                if(view) view.classList.add('hidden'); if(tab) tab.classList.remove('active', 'border-l-4', 'border-blue-500');
+            });
+            const v = document.getElementById(`view-${tabId}`); const tb = document.getElementById(`tab-${tabId}`);
+            if(v) v.classList.remove('hidden'); if(tb) tb.classList.add('active', 'border-l-4', 'border-blue-500');
+            if(tabId === 'schedule') renderSchedule(); if(tabId === 'settings') renderSettings();
+        };
+
+        function populateSubjectDropdowns() {
+            const selects = ['task-subject', 'filter-subj', 'event-subj', 'grade-subj', 'tpl-subj'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    const val = el.value; el.innerHTML = id === 'filter-subj' ? '<option value="All">All Subjects</option>' : '';
+                    window.state.subjects.forEach(s => el.innerHTML += `<option value="${s.name}">${s.name}</option>`);
+                    if(val && window.state.subjects.find(x=>x.name===val)) el.value = val;
+                }
+            });
+        }
+
+        function renderAll() {
+            renderDashboard(); renderTriage(); if(!document.getElementById('view-schedule').classList.contains('hidden')) renderSchedule();
+            renderFinTasks(); renderFinance(); renderFlashcards(); renderPrompts(); renderLinks(); renderGrades(); renderMnemonics(); renderWellness();
+            if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
+        }
+
+        let calcVal = '';
+        window.calcPress = function(v) {
+            if(v === 'C') calcVal = ''; else if(v === '=') { try { calcVal = eval(calcVal).toString(); } catch(e) { calcVal = 'Err'; } } else calcVal += v;
+            document.getElementById('calc-display').innerText = calcVal || '0';
+        };
+
+        window.quickAddTask = function() {
+            const val = document.getElementById('quick-task-input').value.trim(); if(!val) return;
+            window.state.tasks.push({ id: Date.now().toString(), name: val, subject: 'General', type: 'General Task', priority: 'Medium', dueDate: toLocalDateStr(new Date()), time: '', notes: '', dateAdded: new Date().toISOString(), completed: false });
+            document.getElementById('quick-task-input').value = ''; window.saveState(); window.showToast("Quick task added!");
+        };
+
+        function renderDashboard() {
+            const t = window.state.tasks || []; const total = t.length; const completed = t.filter(x => x.completed).length;
+            const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+            document.getElementById('master-progress-bar').style.width = `${pct}%`; document.getElementById('master-progress-text').innerText = `${completed} of ${total} tasks completed`; document.getElementById('master-progress-pct').innerText = `${pct}%`;
+            document.getElementById('total-focus-time').innerHTML = `${window.state.totalFocusMins || 0}<span class="text-xl opacity-75 font-medium ml-1">m</span>`;
+            
+            let greeting = "Good evening"; const hr = new Date().getHours(); if (hr < 12) greeting = "Good morning"; else if (hr < 18) greeting = "Good afternoon";
+            document.getElementById('greeting-text').innerText = `${greeting}, Doctor. ${window.state.acadProfile.year}Y Sem ${window.state.acadProfile.sem} snapshot.`;
+
+            const dashTasks = document.getElementById('dash-tasks-list');
+            if (dashTasks) {
+                dashTasks.innerHTML = ''; const weight = { 'High': 3, 'Medium': 2, 'Low': 1 };
+                let sortedTasks = [...t].sort((a, b) => {
+                    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                    if (weight[b.priority] !== weight[a.priority]) return weight[b.priority] - weight[a.priority];
+                    return new Date(a.dueDate) - new Date(b.dueDate);
+                });
+                if(sortedTasks.length === 0) dashTasks.innerHTML = `<div class="text-center p-4 text-slate-400 italic text-sm border border-dashed border-slate-200 rounded-xl">No tasks pending!</div>`;
+                sortedTasks.forEach(tk => {
+                    const taskType = tk.type || 'General Task';
+                    dashTasks.innerHTML += `<div class="flex items-center p-3 bg-white rounded-xl border border-slate-200 ${tk.completed ? 'opacity-50' : 'shadow-sm'} mb-2">
+                        <button onclick="toggleTask('${tk.id}')" class="text-xl mr-3 ${tk.completed ? 'text-emerald-500' : 'text-slate-300'}"><i class="fa-${tk.completed ? 'solid' : 'regular'} fa-circle-check"></i></button>
+                        <div class="flex-1 min-w-0"><h4 class="font-bold text-sm text-slate-800 truncate ${tk.completed ? 'line-through' : ''}">${tk.name}</h4>
+                        <div class="flex gap-1 mt-1 text-[9px] overflow-x-auto"><span class="${tk.priority==='High'?'text-red-600 bg-red-100':(tk.priority==='Medium'?'text-yellow-700 bg-yellow-100':'text-green-700 bg-green-100')} px-1.5 py-0.5 rounded font-bold shrink-0">${tk.priority}</span><span class="${getSubjStyle(tk.subject)} border px-1.5 py-0.5 rounded font-bold truncate shrink-0">${tk.subject}</span></div></div>
+                        <button onclick="editTask('${tk.id}')" class="text-slate-300 hover:text-blue-500 p-2 ml-1"><i class="fa-solid fa-pen"></i></button>
+                    </div>`;
+                });
+            }
+
+            const deadList = document.getElementById('dash-deadlines-list');
+            if (deadList) {
+                deadList.innerHTML = ''; const today = new Date(); today.setHours(0,0,0,0);
+                const critical = t.filter(x => !x.completed && (x.priority === 'High' || x.type === 'Long Quiz' || x.type === 'Short Quiz')).sort((a,b) => new Date(a.dueDate) - new Date(b.dueDate));
+                if(critical.length === 0) deadList.innerHTML = `<div class="text-center p-4 text-slate-400 italic text-sm border border-dashed border-slate-200 rounded-xl">No immediate threats!</div>`;
+                critical.forEach(tk => {
+                    const due = new Date(tk.dueDate); due.setHours(0,0,0,0); const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                    let dText = diffDays < 0 ? 'Overdue!' : diffDays === 0 ? 'Due Today!' : `In ${diffDays}d`;
+                    deadList.innerHTML += `<div class="p-3 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 flex justify-between items-center"><div class="flex-1 min-w-0"><h4 class="font-bold text-sm text-slate-800 truncate">${tk.name}</h4><div class="text-[10px] font-bold text-slate-500 mt-1 uppercase">${tk.subject} • ${tk.type}</div></div><div class="text-xs font-black ${diffDays <= 1 ? 'text-red-600 bg-red-100' : 'text-amber-600 bg-amber-100'} px-2 py-1 rounded ml-2 shrink-0 animate-pulse">${dText}</div></div>`;
+                });
+            }
+        }
+
+        let editingTaskId = null;
+        window.editTask = function(id) {
+            const t = window.state.tasks.find(x => x.id === id); if(!t) return;
+            document.getElementById('task-name').value = t.name; document.getElementById('task-subject').value = t.subject;
+            document.getElementById('task-type').value = t.type || 'General Task'; document.getElementById('task-priority').value = t.priority;
+            document.getElementById('task-due').value = t.dueDate; document.getElementById('task-time').value = t.time || ''; document.getElementById('task-notes').value = t.notes || '';
+            editingTaskId = id;
+            const btn = document.getElementById('btn-add-task'); btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Update Task'; btn.className = "w-full bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl font-bold transition-colors shadow-sm";
+            switchTab('triage'); document.getElementById('view-triage').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.addTask = function() {
+            const n = document.getElementById('task-name').value.trim(); const s = document.getElementById('task-subject').value;
+            const ty = document.getElementById('task-type').value; const p = document.getElementById('task-priority').value;
+            const d = document.getElementById('task-due').value; const tm = document.getElementById('task-time').value; const nt = document.getElementById('task-notes').value.trim();
+            if (!n || !d) return showToast("Task name and Due Date required.", true);
+            if (editingTaskId) {
+                const t = window.state.tasks.find(x => x.id === editingTaskId);
+                if(t) { t.name=n; t.subject=s; t.type=ty; t.priority=p; t.dueDate=d; t.time=tm; t.notes=nt; }
+                editingTaskId = null;
+                const btn = document.getElementById('btn-add-task'); btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> Add Task to Triage'; btn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition-colors shadow-sm";
+                showToast("Task updated!");
+            } else {
+                window.state.tasks.push({ id: Date.now().toString(), name: n, subject: s, type: ty, priority: p, dueDate: d, time: tm, notes: nt, dateAdded: new Date().toISOString(), completed: false });
+                showToast("Task added!");
+            }
+            document.getElementById('task-name').value = ''; document.getElementById('task-notes').value = ''; window.saveState();
+        };
+
+        window.toggleTask = function(id) { const t = window.state.tasks.find(x => x.id === id); if (t) { t.completed = !t.completed; window.saveState(); } };
+        window.deleteTask = function(id) { window.state.tasks = window.state.tasks.filter(x => x.id !== id); window.saveState(); };
+
+        function renderTriage() {
+            const list = document.getElementById('triage-list'); list.innerHTML = '';
+            const fSubj = document.getElementById('filter-subj').value; const fPri = document.getElementById('filter-pri').value;
+            let filtered = window.state.tasks;
+            if(fSubj !== 'All') filtered = filtered.filter(x => x.subject === fSubj); if(fPri !== 'All') filtered = filtered.filter(x => x.priority === fPri);
+            if(filtered.length === 0) { list.innerHTML = `<div class="text-center p-8 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-300">No tasks match criteria.</div>`; return; }
+
+            const renderCard = (t) => {
+                const overdue = !t.completed && new Date(t.dueDate) < new Date(new Date().setHours(0,0,0,0)); const pBorder = { 'High': 'border-l-red-500', 'Medium': 'border-l-yellow-500', 'Low': 'border-l-green-500' };
+                return `<div class="p-3 bg-white rounded-lg border border-r border-y border-l-4 ${t.completed ? 'border-slate-200 opacity-60 bg-slate-50' : pBorder[t.priority] + ' shadow-sm'} mb-2 relative flex flex-col sm:flex-row sm:items-center group">
+                    <div class="flex items-start sm:items-center flex-1 min-w-0">
+                        <button onclick="toggleTask('${t.id}')" class="text-2xl mr-3 mt-1 sm:mt-0 ${t.completed ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'} shrink-0"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-slate-800 text-base ${t.completed ? 'line-through text-slate-500' : ''} leading-tight mb-1 pr-2">${t.name}</h3>
+                            <div class="flex items-center gap-1.5 flex-wrap"><span class="text-[9px] px-1.5 py-0.5 rounded font-bold border ${getSubjStyle(t.subject)}">${t.subject}</span><span class="text-[10px] text-slate-500 ml-1 font-medium"><i class="fa-regular fa-calendar mr-1"></i>${new Date(t.dueDate).toLocaleDateString()}</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-2 sm:mt-0 sm:ml-2 flex justify-end shrink-0 pt-2 sm:pt-0"><button onclick="editTask('${t.id}')" class="text-slate-400 hover:text-blue-500 p-2"><i class="fa-solid fa-pen"></i></button><button onclick="deleteTask('${t.id}')" class="text-slate-400 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button></div>
+                </div>`;
+            };
+
+            const active = filtered.filter(x => !x.completed); const completed = filtered.filter(x => x.completed);
+            ['High', 'Medium', 'Low'].forEach(pri => {
+                const grp = active.filter(x => x.priority === pri).sort((a,b) => new Date(a.dueDate) - new Date(b.dueDate));
+                if(grp.length > 0) {
+                    const col = pri==='High'?'text-red-700 bg-red-50 border-red-200':(pri==='Medium'?'text-yellow-700 bg-yellow-50 border-yellow-200':'text-green-700 bg-green-50 border-green-200');
+                    list.innerHTML += `<div class="mb-4"><h4 class="font-bold text-xs ${col} px-3 py-1.5 rounded-t-lg uppercase border-x border-t">${pri} Priority (${grp.length})</h4><div class="bg-slate-50 p-2 rounded-b-lg border shadow-inner">${grp.map(t => renderCard(t)).join('')}</div></div>`;
+                }
+            });
+            if(completed.length > 0) list.innerHTML += `<div class="mt-6 pt-4 border-t border-slate-200"><h4 class="font-bold text-xs text-slate-500 mb-3 bg-slate-100 px-3 py-1.5 rounded-lg w-max"><i class="fa-solid fa-check-double mr-2"></i>Completed (${completed.length})</h4><div class="opacity-70 space-y-2">${completed.sort((a,b) => new Date(b.dueDate) - new Date(a.dueDate)).map(t => renderCard(t)).join('')}</div></div>`;
+        }
+
+        let currentSchedView = 'daily'; let currentDate = new Date();
+        window.changeDate = function(dir) {
+            if(currentSchedView === 'daily') currentDate.setDate(currentDate.getDate() + dir);
+            else if (currentSchedView === 'weekly') currentDate.setDate(currentDate.getDate() + (dir * 7));
+            else if (currentSchedView === 'monthly') currentDate.setMonth(currentDate.getMonth() + dir);
+            renderSchedule();
+        };
+
+        window.openDayModal = function(y, m, d) {
+            const date = new Date(y, m, d); const dStr = toLocalDateStr(date); const dayOfWeekStr = date.getDay().toString();
+            document.getElementById('day-modal-title').innerText = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            const tpl = window.state.acadProfile || {}; let applies = false;
+            if(tpl.active && tpl.validFrom && tpl.validUntil) if(dStr >= tpl.validFrom && dStr <= tpl.validUntil) applies = true;
+            const classesToday = applies && tpl.schedule ? (tpl.schedule[dayOfWeekStr] || []) : [];
+            const events = (window.state.schedule||[]).filter(x=>x.date===dStr);
+            const tasks = (window.state.tasks||[]).filter(x=>x.dueDate===dStr);
+            
+            let html = `<h4 class="font-bold text-sm text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-school mr-2 text-indigo-500"></i>Events</h4>`;
+            if (classesToday.length === 0 && events.length === 0) html += `<p class="text-sm text-slate-400 italic mb-4 p-3 border border-dashed rounded-lg">No events scheduled.</p>`;
+            else {
+                html += `<div class="space-y-2 mb-6">`;
+                classesToday.forEach(e => html += `<div class="p-3 rounded-lg border bg-white ${getSubjStyle(e.subj)} flex justify-between"><span class="font-bold text-sm">${e.title}</span><span class="text-[10px] px-2 py-1 bg-white/50 rounded font-black">${e.time || 'All Day'}</span></div>`);
+                events.forEach(e => html += `<div class="p-3 rounded-lg border bg-white shadow-sm flex justify-between"><span class="font-bold text-sm">${e.title}</span><span class="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-black">${e.time || 'All Day'}</span></div>`);
+                html += `</div>`;
+            }
+            html += `<h4 class="font-bold text-sm text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-list-check mr-2 text-rose-500"></i>Tasks</h4>`;
+            if (tasks.length === 0) html += `<p class="text-sm text-slate-400 italic p-3 border border-dashed rounded-lg">No tasks due.</p>`;
+            else {
+                html += `<div class="space-y-2">`;
+                tasks.forEach(t => html += `<div class="p-3 rounded-lg border bg-white flex gap-3 ${t.completed ? 'opacity-60 border-slate-200' : 'shadow-sm'}"><button onclick="event.stopPropagation(); toggleTask('${t.id}'); openDayModal(${y},${m},${d})" class="text-xl shrink-0 mt-0.5 ${t.completed ? 'text-emerald-500' : 'text-slate-300'}"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button><div class="flex-1 font-bold text-sm ${t.completed ? 'line-through text-slate-500' : 'text-slate-800'} break-words">${t.name}</div></div>`);
+                html += `</div>`;
+            }
+            document.getElementById('day-modal-content').innerHTML = html;
+            document.getElementById('day-modal').classList.remove('hidden');
+        };
+        
+        window.closeDayModal = function(e) { if(e && e.target.id !== 'day-modal') return; document.getElementById('day-modal').classList.add('hidden'); renderSchedule(); };
+        window.setScheduleView = function(view) { currentSchedView = view; renderSchedule(); };
+        window.addScheduleEvent = function() {
+            const t = document.getElementById('event-title').value.trim(); const d = document.getElementById('event-date').value;
+            if(!t || !d) return showToast("Title and Date required.", true);
+            window.state.schedule.push({ id: Date.now().toString(), title: t, date: d, time: document.getElementById('event-time').value, subj: document.getElementById('event-subj').value });
+            document.getElementById('event-title').value = ''; window.saveState(); showToast("Event saved!");
+        };
+        window.deleteScheduleEvent = function(id) { window.state.schedule = window.state.schedule.filter(x => x.id !== id); window.saveState(); };
+
+        function renderSchedule() {
+            const c = document.getElementById('schedule-container'); c.innerHTML = '';
+            document.getElementById('btn-view-daily').className = currentSchedView === 'daily' ? "px-4 py-1.5 rounded text-sm font-medium bg-white shadow-sm text-slate-800" : "px-4 py-1.5 rounded text-sm font-medium text-slate-500";
+            document.getElementById('btn-view-weekly').className = currentSchedView === 'weekly' ? "px-4 py-1.5 rounded text-sm font-medium bg-white shadow-sm text-slate-800" : "px-4 py-1.5 rounded text-sm font-medium text-slate-500";
+            document.getElementById('btn-view-monthly').className = currentSchedView === 'monthly' ? "px-4 py-1.5 rounded text-sm font-medium bg-white shadow-sm text-slate-800" : "px-4 py-1.5 rounded text-sm font-medium text-slate-500";
+
+            let titleText = "";
+            if (currentSchedView === 'daily') {
+                titleText = currentDate.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+            } else if (currentSchedView === 'weekly') {
+                const s = new Date(currentDate); s.setDate(s.getDate() - s.getDay() + (s.getDay()===0?-6:1));
+                const e = new Date(s); e.setDate(s.getDate() + 6);
+                titleText = `${s.toLocaleDateString('en-US',{month:'short', day:'numeric'})} - ${e.toLocaleDateString('en-US',{month:'short', day:'numeric'})}`;
+            } else {
+                titleText = currentDate.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+            }
+
+            const navHtml = `<div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-4"><button onclick="changeDate(-1)" class="px-4 py-2 bg-slate-100 rounded-lg text-slate-600 font-bold"><i class="fa-solid fa-chevron-left"></i></button><h3 class="text-lg font-black text-slate-700">${titleText}</h3><button onclick="changeDate(1)" class="px-4 py-2 bg-slate-100 rounded-lg text-slate-600 font-bold"><i class="fa-solid fa-chevron-right"></i></button></div>`;
+
+            if (currentSchedView === 'daily') {
+                const dStr = toLocalDateStr(currentDate); const dayOfWeekStr = currentDate.getDay().toString();
+                const applies = (window.state.acadProfile.active && dStr >= window.state.acadProfile.validFrom && dStr <= window.state.acadProfile.validUntil);
+                const classesToday = applies && window.state.acadProfile.schedule ? (window.state.acadProfile.schedule[dayOfWeekStr] || []) : [];
+                const events = window.state.schedule.filter(x => x.date === dStr);
+                const tasks = window.state.tasks.filter(x => x.dueDate === dStr);
+
+                let html = navHtml + `<div class="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[400px]">`;
+                html += `<div class="bg-slate-50 border rounded-xl p-4 shadow-inner flex flex-col gap-3"><h4 class="font-bold text-slate-700 border-b pb-2"><i class="fa-solid fa-school text-indigo-500 mr-2"></i>Events</h4>`;
+                [...classesToday, ...events].sort((a,b) => (a.time||'').localeCompare(b.time||'')).forEach(e => {
+                    html += `<div class="p-3 rounded-lg shadow-sm border ${getSubjStyle(e.subj)} flex justify-between bg-white"><div><div class="font-bold text-sm">${e.title}</div><div class="text-xs opacity-80">${e.time || 'All Day'}</div></div>${e.id ? `<button onclick="deleteScheduleEvent('${e.id}')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : ''}</div>`;
+                });
+                html += `</div><div class="bg-slate-50 border rounded-xl p-4 shadow-inner flex flex-col gap-3"><h4 class="font-bold text-slate-700 border-b pb-2"><i class="fa-solid fa-list-check text-rose-500 mr-2"></i>Tasks Due</h4>`;
+                tasks.sort((a,b) => a.completed - b.completed).forEach(t => {
+                    html += `<div class="flex items-start p-3 bg-white rounded-lg border ${t.completed ? 'opacity-60' : 'shadow-sm'} gap-3"><button onclick="toggleTask('${t.id}')" class="text-xl ${t.completed ? 'text-emerald-500' : 'text-slate-300'}"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button><div class="flex-1 font-bold text-sm ${t.completed ? 'line-through text-slate-500' : 'text-slate-800'}">${t.name}</div></div>`;
+                });
+                c.innerHTML = html + `</div></div>`;
+            } else if (currentSchedView === 'monthly') {
+                const sMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1); const pad = sMonth.getDay() === 0 ? 6 : sMonth.getDay() - 1; 
+                let html = navHtml + `<div class="grid grid-cols-7 gap-1 md:gap-2 h-full">`;
+                ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => html += `<div class="text-center font-bold text-slate-500 text-[10px] md:text-xs py-2 bg-slate-100 rounded">${d}</div>`);
+                for(let i=0; i<pad; i++) html += `<div></div>`;
+                for(let i=1; i<=new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate(); i++) {
+                    const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), i); const dStr = toLocalDateStr(d);
+                    const isToday = dStr === toLocalDateStr(new Date());
+                    html += `<div onclick="openDayModal(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" class="p-1 border ${isToday ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white'} rounded-lg min-h-[80px] md:min-h-[100px] flex flex-col overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all"><div class="text-[10px] md:text-xs font-bold ${isToday ? 'text-indigo-700 bg-indigo-200 w-5 h-5 flex items-center justify-center rounded-full' : 'text-slate-400'} ml-auto mb-1">${i}</div><div class="space-y-1 overflow-y-auto flex-1 no-scrollbar">`;
+                    const classesToday = (window.state.acadProfile.active && dStr >= window.state.acadProfile.validFrom && dStr <= window.state.acadProfile.validUntil) && window.state.acadProfile.schedule ? (window.state.acadProfile.schedule[d.getDay().toString()] || []) : [];
+                    classesToday.forEach(e => html += `<div class="text-[8px] md:text-[9px] truncate p-1 rounded font-medium border bg-white ${getSubjStyle(e.subj)}">${e.title}</div>`);
+                    (window.state.schedule||[]).filter(x=>x.date===dStr).forEach(e => html += `<div class="text-[8px] md:text-[9px] truncate p-1 rounded bg-slate-100 border border-slate-300 font-bold">${e.title}</div>`);
+                    (window.state.tasks||[]).filter(x=>x.dueDate===dStr && !x.completed).forEach(t => html += `<button onclick="event.stopPropagation(); toggleTask('${t.id}')" class="text-[8px] md:text-[9px] text-left w-full p-1 rounded border font-bold bg-white ${getSubjStyle(t.subject)} truncate">${t.name}</button>`);
+                    html += `</div></div>`;
+                }
+                c.innerHTML = html + `</div>`;
+            } else {
+                const s = new Date(currentDate); s.setDate(s.getDate() - s.getDay() + (s.getDay()===0?-6:1));
+                let html = navHtml + `<div class="flex flex-col gap-4 pb-4 h-full">`;
+                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                
+                for(let i=0; i<7; i++) {
+                    const d = new Date(s); d.setDate(s.getDate() + i);
+                    const dStr = toLocalDateStr(d);
+                    const dayOfWeekStr = d.getDay().toString();
+                    const isToday = dStr === toLocalDateStr(new Date());
+                    
+                    let applies = false;
+                    const tpl = window.state.acadProfile;
+                    if(tpl && tpl.active && tpl.validFrom && tpl.validUntil) {
+                        if(dStr >= tpl.validFrom && dStr <= tpl.validUntil) applies = true;
+                    }
+                    const classesToday = applies && tpl.schedule ? (tpl.schedule[dayOfWeekStr] || []) : [];
+                    const dayEvents = (window.state.schedule||[]).filter(x => x.date === dStr);
+                    const dayTasks = (window.state.tasks||[]).filter(x => x.dueDate === dStr && !x.completed);
+
+                    html += `<div class="flex flex-col md:flex-row border ${isToday ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-white'} rounded-xl overflow-hidden shadow-sm">
+                            <div class="${isToday ? 'bg-indigo-100 text-indigo-900' : 'bg-slate-50 text-slate-700'} p-4 md:w-28 shrink-0 border-b md:border-b-0 md:border-r border-slate-200 flex md:flex-col justify-between md:justify-center items-center text-center">
+                                <div class="font-bold text-lg">${days[i]}</div>
+                                <div class="text-xs uppercase font-bold tracking-wider">${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+                            </div>
+                            <div class="p-4 flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+                                <div class="space-y-2 min-w-0">
+                                    <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2"><i class="fa-regular fa-clock mr-1"></i> Events</h5>`;
+                                    
+                    classesToday.forEach(e => html += `<div class="p-2 rounded shadow-sm text-xs border bg-white ${getSubjStyle(e.subj)} flex flex-col"><div class="font-bold truncate">${e.title}</div><div class="text-[9px] font-semibold tracking-wide">${e.time}</div></div>`);
+                    dayEvents.forEach(e => html += `<div class="bg-white border border-slate-300 p-2 rounded shadow-sm text-xs flex justify-between items-center relative group"><div class="font-bold text-slate-800 truncate flex-1 min-w-0 pr-2">${e.title}</div><button onclick="deleteScheduleEvent('${e.id}')" class="text-slate-400 hover:text-red-500 p-1 shrink-0"><i class="fa-solid fa-xmark"></i></button></div>`);
+                    if (classesToday.length === 0 && dayEvents.length === 0) html += `<div class="text-xs text-slate-400 italic">No events</div>`;
+                    
+                    html += `   </div><div class="space-y-2 min-w-0">
+                                    <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2"><i class="fa-solid fa-list-check mr-1"></i> Tasks</h5>`;
+                    
+                    dayTasks.forEach(t => {
+                        const taskType = t.type || 'General Task';
+                        html += `<button onclick="toggleTask('${t.id}')" class="bg-white ${getSubjStyle(t.subject)} p-2 rounded shadow-sm text-xs border flex flex-col gap-1 w-full text-left hover:opacity-80 transition-opacity min-w-0">
+                            <div class="font-bold text-slate-800 flex items-start w-full min-w-0"><i class="fa-solid fa-circle-exclamation text-rose-500 mr-1.5 mt-0.5 shrink-0"></i><span class="truncate block">${t.name}</span></div>
+                            <div class="flex gap-1 text-[9px] mt-1 ml-4 overflow-x-auto no-scrollbar"><span class="px-1.5 py-0.5 bg-white/70 rounded border border-white font-bold whitespace-nowrap">${t.subject}</span><span class="px-1.5 py-0.5 bg-white/70 rounded border border-white font-bold text-slate-600 whitespace-nowrap">${taskType}</span></div>
+                        </button>`;
+                    });
+                    if (dayTasks.length === 0) html += `<div class="text-xs text-slate-400 italic">No tasks</div>`;
+                    
+                    html += `   </div></div></div>`;
+                }
+                c.innerHTML = html + `</div>`;
+            }
+        }
+
+        let timerInt; let timeRem = 25 * 60; let isRun = false;
+        window.setTimer = function(mins) { clearInterval(timerInt); isRun = false; timeRem = mins * 60; document.getElementById('timer-display').innerText = `${mins.toString().padStart(2, '0')}:00`; const btn = document.getElementById('btn-timer-toggle'); btn.innerText = "Start"; btn.className = "flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold"; };
+        window.toggleTimer = function() {
+            const btn = document.getElementById('btn-timer-toggle');
+            if (isRun) { clearInterval(timerInt); btn.innerText = "Resume"; btn.className = "flex-1 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold"; } 
+            else { timerInt = setInterval(() => { timeRem--; const m = Math.floor(timeRem / 60).toString().padStart(2, '0'); const s = (timeRem % 60).toString().padStart(2, '0'); document.getElementById('timer-display').innerText = `${m}:${s}`; if (timeRem <= 0) { clearInterval(timerInt); showToast("Focus Complete!"); if (document.getElementById('timer-display').innerText === "00:00") { window.state.totalFocusMins += 25; window.saveState(); } } }, 1000); btn.innerText = "Pause"; btn.className = "flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-bold"; }
+            isRun = !isRun;
+        };
+        window.resetTimer = function() { window.setTimer(25); };
+
+        window.addLink = function() { const t = document.getElementById('link-name').value.trim(); const u = document.getElementById('link-url').value.trim(); if(t && u) { window.state.links.push({ id: Date.now().toString(), title: t, url: u }); document.getElementById('link-name').value = ''; document.getElementById('link-url').value = ''; window.saveState(); } };
+        window.deleteLink = function(id) { window.state.links = window.state.links.filter(l => l.id !== id); window.saveState(); };
+        function renderLinks() {
+            const c = document.getElementById('links-container'); c.innerHTML = '';
+            window.state.links.forEach(l => { c.innerHTML += `<div class="flex justify-between items-center bg-slate-50 border p-3 rounded-lg mb-2"><a href="${l.url}" target="_blank" class="font-medium text-blue-600 hover:underline truncate"><i class="fa-solid fa-link mr-2"></i>${l.title}</a><button onclick="deleteLink('${l.id}')" class="text-slate-300 hover:text-red-500 ml-2"><i class="fa-solid fa-trash-can"></i></button></div>`; });
+        }
+
+        window.addPrompt = function() { const t = document.getElementById('prompt-title').value.trim(); const p = document.getElementById('prompt-text').value.trim(); if(t && p) { window.state.prompts.push({ id: Date.now().toString(), title: t, text: p }); document.getElementById('prompt-title').value = ''; document.getElementById('prompt-text').value = ''; window.saveState(); } };
+        window.deletePrompt = function(id) { window.state.prompts = window.state.prompts.filter(x => x.id !== id); window.saveState(); };
+        window.copyPromptText = function(id) { const p = window.state.prompts.find(x => x.id === id); if(p) window.fallbackCopyTextToClipboard(p.text); };
+        window.renderPrompts = function() {
+            const c = document.getElementById('prompts-container'); c.innerHTML = '';
+            const q = (document.getElementById('prompt-search')?.value || '').toLowerCase();
+            const filtered = window.state.prompts.filter(p => p.title.toLowerCase().includes(q) || p.text.toLowerCase().includes(q));
+            
+            if (filtered.length === 0) { c.innerHTML = `<div class="text-center p-4 text-slate-400 italic text-sm">No prompts found.</div>`; return; }
+            
+            filtered.forEach(p => {
+                c.innerHTML += `<div class="border border-emerald-200 bg-emerald-50 p-4 rounded-xl shadow-sm mb-3">
+                    <div class="flex justify-between items-start mb-2"><h4 class="font-bold text-emerald-800 text-sm">${p.title}</h4><button onclick="deletePrompt('${p.id}')" class="text-slate-400 hover:text-red-500 p-1 ml-2"><i class="fa-solid fa-trash-can"></i></button></div>
+                    <div class="text-xs text-slate-600 whitespace-pre-wrap mb-3 border border-emerald-100 bg-white p-3 rounded shadow-inner select-text break-words">${p.text}</div>
+                    <button onclick="copyPromptText('${p.id}')" class="w-full bg-emerald-600 border border-emerald-700 text-white py-2 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"><i class="fa-regular fa-copy mr-1"></i> Copy Full Prompt</button>
+                </div>`;
+            });
+        };
+
+        let fcViewMode = 'due';
+        window.setFCView = function(view) {
+            fcViewMode = view;
+            document.getElementById('btn-fc-due').className = view === 'due' ? "px-3 py-1 rounded text-xs font-medium bg-white shadow-sm text-slate-800" : "px-3 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors";
+            document.getElementById('btn-fc-all').className = view === 'all' ? "px-3 py-1 rounded text-xs font-medium bg-white shadow-sm text-slate-800" : "px-3 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors";
+            renderFlashcards();
+        };
+        window.addFC = function() {
+            const f = document.getElementById('fc-front').value.trim(); const b = document.getElementById('fc-back').value.trim();
+            if(!f || !b) return;
+            window.state.flashcards.push({ id: Date.now().toString(), front: f, back: b, show: false, nextReview: toLocalDateStr(new Date()) });
+            document.getElementById('fc-front').value = ''; document.getElementById('fc-back').value = '';
+            window.saveState();
+        };
+        window.toggleFC = function(id) { const fc = window.state.flashcards.find(x => x.id === id); if(fc) { fc.show = !fc.show; renderFlashcards(); } };
+        window.reviewFC = function(id, d) {
+            event.stopPropagation(); const fc = window.state.flashcards.find(x => x.id === id);
+            if(fc) { const n = new Date(); n.setDate(n.getDate() + d); fc.nextReview = toLocalDateStr(n); fc.show = false; window.saveState(); showToast(`Review in ${d}d!`); }
+        };
+        window.deleteFC = function(id) { event.stopPropagation(); window.state.flashcards = window.state.flashcards.filter(x => x.id !== id); window.saveState(); };
+        function renderFlashcards() {
+            const c = document.getElementById('flashcards-container'); if(!c) return;
+            c.innerHTML = '';
+            const today = toLocalDateStr(new Date());
+            const due = window.state.flashcards.filter(x => !x.nextReview || x.nextReview <= today);
+            const dueCount = document.getElementById('fc-due-count'); if(dueCount) dueCount.innerText = `${due.length} Due`;
+            const cards = fcViewMode === 'due' ? due : window.state.flashcards;
+            if(cards.length === 0) { c.innerHTML = `<div class="text-center p-6 text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">No cards.</div>`; return; }
+            cards.forEach(fc => {
+                c.innerHTML += `<div class="border ${fc.show ? 'border-purple-300 bg-purple-50' : 'border-purple-200 bg-white'} p-4 rounded-xl flex flex-col justify-center items-center text-center cursor-pointer min-h-[160px] relative shadow-sm" onclick="toggleFC('${fc.id}')">
+                    <button onclick="deleteFC('${fc.id}')" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 p-2 z-10"><i class="fa-solid fa-trash-can"></i></button>
+                    ${fc.show ? `<div class="text-sm text-purple-800 whitespace-pre-wrap font-medium mb-12">${fc.back}</div><div class="absolute bottom-2 left-2 right-2 flex gap-1 justify-center z-10"><button onclick="reviewFC('${fc.id}', 1)" class="flex-1 bg-rose-100 text-rose-700 py-1.5 rounded text-xs font-bold">Hard (1d)</button><button onclick="reviewFC('${fc.id}', 3)" class="flex-1 bg-amber-100 text-amber-700 py-1.5 rounded text-xs font-bold">Good (3d)</button><button onclick="reviewFC('${fc.id}', 7)" class="flex-1 bg-emerald-100 text-emerald-700 py-1.5 rounded text-xs font-bold">Easy (7d)</button></div>` : `<div class="text-lg font-bold text-slate-700">${fc.front}</div><div class="absolute bottom-2 text-[10px] text-slate-400 font-bold">CLICK TO FLIP</div>`}
+                </div>`;
+            });
+        }
+
+        window.addMnemonic = function() {
+            const a = document.getElementById('mn-acronym').value.trim(); const m = document.getElementById('mn-meaning').value.trim();
+            if(!a || !m) return;
+            window.state.mnemonics.push({ id: Date.now().toString(), acronym: a, meaning: m });
+            document.getElementById('mn-acronym').value = ''; document.getElementById('mn-meaning').value = '';
+            window.saveState();
+        };
+        window.deleteMnemonic = function(id) { window.state.mnemonics = window.state.mnemonics.filter(x => x.id !== id); window.saveState(); };
+        function renderMnemonics() {
+            const c = document.getElementById('mnemonics-container'); if(!c) return;
+            c.innerHTML = '';
+            window.state.mnemonics.forEach(m => {
+                c.innerHTML += `<div class="bg-amber-50 border border-amber-200 p-4 rounded-xl shadow-sm relative flex flex-col"><button onclick="deleteMnemonic('${m.id}')" class="absolute top-2 right-2 text-slate-400 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can"></i></button><h4 class="font-black text-amber-800 text-lg mb-2 tracking-wider">${m.acronym}</h4><p class="text-sm text-slate-700 whitespace-pre-wrap font-medium flex-1">${m.meaning}</p></div>`;
+            });
+        }
+
+        window.addGrade = function() {
+            const s = document.getElementById('grade-subj').value; const n = document.getElementById('grade-name').value.trim();
+            const scr = parseFloat(document.getElementById('grade-score').value); const tot = parseFloat(document.getElementById('grade-total').value);
+            if(!n || isNaN(scr) || isNaN(tot) || tot === 0) return showToast("Valid details required.", true);
+            window.state.grades.push({ id: Date.now().toString(), subject: s, name: n, score: scr, total: tot });
+            document.getElementById('grade-name').value=''; document.getElementById('grade-score').value=''; document.getElementById('grade-total').value='';
+            window.saveState();
+        };
+        window.deleteGrade = function(id) { window.state.grades = window.state.grades.filter(x => x.id !== id); window.saveState(); };
+        function renderGrades() {
+            const c = document.getElementById('grades-container'); if(!c) return;
+            c.innerHTML = '';
+            const gChart = document.getElementById('grades-chart'); if(gChart) gChart.innerHTML = '';
+            
+            const subjMap = {};
+            window.state.grades.forEach(g => {
+                if(!subjMap[g.subject]) subjMap[g.subject] = { s:0, t:0 };
+                subjMap[g.subject].s += g.score; subjMap[g.subject].t += g.total;
+            });
+            
+            const keys = Object.keys(subjMap);
+            if(keys.length === 0 && gChart) {
+                gChart.innerHTML = `<div class="text-xs text-slate-400 italic absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">No grade data yet.</div>`;
+            } else if (gChart) {
+                keys.forEach(k => {
+                    const pct = (subjMap[k].s / subjMap[k].t) * 100;
+                    const h = Math.max(5, pct); 
+                    let col = 'bg-emerald-400'; if(pct<85) col='bg-blue-400'; if(pct<75) col='bg-amber-400'; if(pct<60) col='bg-rose-500';
+                    gChart.innerHTML += `<div class="flex flex-col justify-end items-center flex-1 h-full group relative">
+                        <div class="absolute -top-6 bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">${k}: ${pct.toFixed(1)}%</div>
+                        <div class="w-full max-w-[40px] rounded-t-sm transition-all duration-500 ${col}" style="height: ${h}%"></div>
+                        <div class="text-[9px] text-slate-500 truncate w-full text-center mt-1 font-bold">${k.substring(0,4)}</div>
+                    </div>`;
+                });
+            }
+
+            [...window.state.grades].reverse().forEach(g => {
+                const pct = Math.round((g.score / g.total) * 100);
+                const col = pct >= 75 ? 'text-emerald-600' : 'text-rose-600';
+                c.innerHTML += `<div class="flex justify-between items-center bg-white border border-slate-100 p-3 rounded-lg shadow-sm mb-2">
+                    <div class="min-w-0 flex-1 pr-2">
+                        <div class="font-bold text-slate-800 text-sm truncate">${g.name} <span class="text-[9px] font-bold text-slate-500 ml-1 border border-slate-200 px-1.5 py-0.5 rounded bg-slate-50 uppercase">${g.subject}</span></div>
+                        <div class="text-xs text-slate-500 mt-1">Score: ${g.score} / ${g.total}</div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0"><div class="text-lg font-black ${col}">${pct}%</div><button onclick="deleteGrade('${g.id}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button></div>
+                </div>`;
+            });
+        }
+
+        // Wellness Hub Functions
+        window.addWellnessLog = function() {
+            const date = document.getElementById('well-date').value || toLocalDateStr(new Date());
+            const mood = document.getElementById('well-mood').value;
+            const sleep = document.getElementById('well-sleep').value;
+            const note = document.getElementById('well-note').value.trim();
+            
+            if(!window.state.wellnessLogs) window.state.wellnessLogs = [];
+            window.state.wellnessLogs.push({ id: Date.now().toString(), date, mood, sleep, note });
+            
+            document.getElementById('well-sleep').value = ''; document.getElementById('well-note').value = '';
+            window.saveState(); showToast("Log saved!");
+        };
+        window.deleteWellnessLog = function(id) { window.state.wellnessLogs = window.state.wellnessLogs.filter(x => x.id !== id); window.saveState(); };
+        
+        window.addNonMedTask = function() {
+            const task = document.getElementById('nonmed-task').value.trim();
+            if(!task) return;
+            if(!window.state.nonMedTasks) window.state.nonMedTasks = [];
+            window.state.nonMedTasks.push({ id: Date.now().toString(), task, completed: false });
+            document.getElementById('nonmed-task').value = '';
+            window.saveState();
+        };
+        window.toggleNonMedTask = function(id) { const t = window.state.nonMedTasks.find(x => x.id === id); if(t) { t.completed = !t.completed; window.saveState(); } };
+        window.deleteNonMedTask = function(id) { window.state.nonMedTasks = window.state.nonMedTasks.filter(x => x.id !== id); window.saveState(); };
+
+        function renderWellness() {
+            const logList = document.getElementById('wellness-list'); if(!logList) return;
+            logList.innerHTML = '';
+            const logs = window.state.wellnessLogs || [];
+            if(logs.length === 0) { logList.innerHTML = `<div class="text-center p-6 text-slate-400 italic border border-dashed border-slate-200 rounded-xl bg-slate-50">No check-ins yet.</div>`; }
+            else {
+                const moodMap = { "5": "🤩 Great", "4": "🙂 Good", "3": "😐 Okay", "2": "😮‍💨 Tired", "1": "🫠 Burned Out" };
+                const moodCol = { "5": "text-emerald-600 bg-emerald-50 border-emerald-200", "4": "text-teal-600 bg-teal-50 border-teal-200", "3": "text-blue-600 bg-blue-50 border-blue-200", "2": "text-amber-600 bg-amber-50 border-amber-200", "1": "text-rose-600 bg-rose-50 border-rose-200" };
+                
+                [...logs].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(l => {
+                    logList.innerHTML += `<div class="flex items-start p-3 bg-white rounded-xl border border-slate-200 shadow-sm mb-2">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-slate-800 text-sm"><i class="fa-regular fa-calendar text-slate-400 mr-1"></i> ${l.date}</span> 
+                                <span class="text-[10px] px-2 py-0.5 rounded font-bold border ${moodCol[l.mood]}">${moodMap[l.mood]}</span>
+                                ${l.sleep ? `<span class="text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-bed mr-1"></i>${l.sleep}h</span>` : ''}
+                            </div>
+                            ${l.note ? `<div class="text-xs text-slate-600 mt-1 italic pr-2">"${l.note}"</div>` : ''}
+                        </div>
+                        <button onclick="deleteWellnessLog('${l.id}')" class="text-slate-300 hover:text-red-500 p-2 ml-2 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>`;
+                });
+            }
+
+            const nmtList = document.getElementById('nonmed-list');
+            nmtList.innerHTML = '';
+            const nmt = window.state.nonMedTasks || [];
+            if(nmt.length === 0) { nmtList.innerHTML = `<div class="text-center p-4 text-slate-400 italic text-sm">All caught up!</div>`; }
+            else {
+                [...nmt].sort((a,b) => a.completed - b.completed).forEach(t => {
+                    nmtList.innerHTML += `<div class="flex items-center p-2.5 bg-white rounded-lg border border-slate-200 ${t.completed ? 'opacity-50 bg-slate-50' : 'shadow-sm'} mb-2">
+                        <button onclick="toggleNonMedTask('${t.id}')" class="text-lg mr-3 ${t.completed ? 'text-amber-500' : 'text-slate-300'}"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button>
+                        <div class="flex-1 text-sm font-medium ${t.completed ? 'line-through text-slate-500' : 'text-slate-800'}">${t.task}</div>
+                        <button onclick="deleteNonMedTask('${t.id}')" class="text-slate-300 hover:text-red-500 p-1 ml-2"><i class="fa-solid fa-xmark"></i></button>
+                    </div>`;
+                });
+            }
+        }
+
+        // Treasurer Basic To-Dos
+        window.addFinTask = function() { const n = document.getElementById('fin-task-name').value.trim(); const d = document.getElementById('fin-task-due').value; if(!n) return; window.state.finTasks.push({ id: Date.now().toString(), name: n, dueDate: d || 'No Date', completed: false }); document.getElementById('fin-task-name').value = ''; window.saveState(); };
+        window.toggleFinTask = function(id) { const t = window.state.finTasks.find(x => x.id === id); if(t) { t.completed = !t.completed; window.saveState(); } };
+        window.deleteFinTask = function(id) { window.state.finTasks = window.state.finTasks.filter(x => x.id !== id); window.saveState(); };
+        function renderFinTasks() {
+            const list = document.getElementById('fin-task-list'); if(!list) return;
+            list.innerHTML = '';
+            const tasks = window.state.finTasks || [];
+            
+            if (tasks.length === 0) {
+                list.innerHTML = `<div class="text-center p-8 text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200 shadow-inner">
+                    <i class="fa-solid fa-check-double text-3xl text-emerald-300 mb-3 block"></i>
+                    No pending collections. You're all caught up!
+                </div>`;
+                return;
+            }
+            
+            [...tasks].sort((a,b) => a.completed - b.completed).forEach(t => {
+                list.innerHTML += `<div class="flex items-center p-3 bg-white rounded-lg border border-slate-200 ${t.completed ? 'opacity-50 bg-slate-50' : 'shadow-sm'} mb-2"><button onclick="toggleFinTask('${t.id}')" class="text-xl mr-3 ${t.completed ? 'text-emerald-500' : 'text-slate-300'}"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button><div class="flex-1 min-w-0"><h4 class="font-bold text-sm truncate ${t.completed ? 'line-through text-slate-500' : 'text-slate-800'}">${t.name}</h4><div class="text-[10px] text-slate-500 mt-0.5"><i class="fa-regular fa-calendar mr-1"></i> ${t.dueDate}</div></div><button onclick="deleteFinTask('${t.id}')" class="ml-2 text-slate-400 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button></div>`;
+            });
+        }
+        // Advanced Finance Tracker Logic
+        const formatMoney = (amount) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+        
+        function getEffectiveDeposits(weekNum) {
+            const base = weeklyData.find(w => w.week === weekNum);
+            const custom = window.state.finance.customDeposits[weekNum] || {};
+            return {
+                depMB: custom.depMB !== undefined ? custom.depMB : base.depMB,
+                depAT: custom.depAT !== undefined ? custom.depAT : base.depAT,
+                depGL: custom.depGL !== undefined ? custom.depGL : base.depGL,
+                depSV: custom.depSV !== undefined ? custom.depSV : base.depSV,
+                isEdited: !!window.state.finance.customDeposits[weekNum]
+            };
+        }
+
+        function calculateCurrentFinancials() {
+            let cash = window.state.finance.baseStashes.cash || 0;
+            let mbSpending = window.state.finance.baseStashes.mbSpending || 0;
+            let gcash = window.state.finance.baseStashes.gcash || 0;
+            let rcbc = window.state.finance.baseStashes.rcbc || 0;
+            
+            let mb_stash = window.state.finance.baseStashes.mariBank || 0; 
+            let at_stash = window.state.finance.baseStashes.atome || 0; 
+            let gl_stash = window.state.finance.baseStashes.gLoan || 0; 
+            let sv_stash = window.state.finance.baseStashes.savings || 0;
+            
+            let mb_debt = window.state.finance.debts.mariBank || 0; 
+            let gl_debt = window.state.finance.debts.gLoan || 0; 
+            let at_debt = window.state.finance.debts.atome || 0;
+            
+            [...window.state.finance.completedWeeks].sort((a, b) => a - b).forEach(weekNum => {
+                const w = weeklyData.find(d => d.week === weekNum); if (!w) return;
+                const effective = getEffectiveDeposits(weekNum);
+                mb_stash += effective.depMB; at_stash += effective.depAT; gl_stash += effective.depGL; sv_stash += effective.depSV;
+
+                if (w.billAmt > 0 && w.payFrom !== 'None') {
+                    switch (w.payFrom) {
+                        case 'mariBank': mb_stash -= w.billAmt; break; case 'atome': at_stash -= w.billAmt; break;
+                        case 'gLoan': gl_stash -= w.billAmt; break; case 'savings': sv_stash -= w.billAmt; break;
+                        case 'atome_gloan': at_stash -= 1600; gl_stash -= (w.billAmt - 1600); break;
+                    }
+                    if (w.billType.includes('MariBank')) mb_debt -= w.billAmt; else if (w.billType === 'GLoan') gl_debt -= w.billAmt; else if (w.billType === 'Atome') at_debt -= w.billAmt;
+                    else if (w.billType === 'Atome & GLoan') { at_debt -= 1600; gl_debt -= (w.billAmt - 1600); }
+                }
+            });
+            mb_debt = Math.max(0, mb_debt); gl_debt = Math.max(0, gl_debt); at_debt = Math.max(0, at_debt);
+            
+            const totalAssets = cash + mbSpending + gcash + rcbc + mb_stash + at_stash + gl_stash + sv_stash;
+            const totalLiabilities = mb_debt + gl_debt + at_debt;
+            
+            return { 
+                stashes: { cash, mbSpending, gcash, rcbc, mariBank: mb_stash, atome: at_stash, gLoan: gl_stash, savings: sv_stash },
+                debts: { mb: mb_debt, gl: gl_debt, at: at_debt },
+                totals: { assets: totalAssets, liabilities: totalLiabilities, netWorth: totalAssets - totalLiabilities }
+            };
+        }
+
+        window.toggleWeek = function(weekNum) {
+            if (window.state.finance.completedWeeks.includes(weekNum)) window.state.finance.completedWeeks = window.state.finance.completedWeeks.filter(w => w !== weekNum);
+            else window.state.finance.completedWeeks.push(weekNum);
+            window.saveState();
+        };
+
+        window.resetFinanceData = function() {
+            showToast("Roadmap reset. Rebuilding layout...");
+            window.state.finance = { completedWeeks: [], customDeposits: {}, debts: { ...initialDebts }, baseStashes: { ...initialBalances } };
+            window.saveState();
+        };
+
+        // NEW: Transfer and Expense Feature Logic
+        window.openTransferModal = function() {
+            document.getElementById('transfer-amount').value = '';
+            document.getElementById('transfer-date').innerText = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const modal = document.getElementById('transfer-modal');
+            const content = document.getElementById('transfer-modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('translate-y-full', 'scale-95'); }, 10);
+        };
+        
+        window.closeTransferModal = function() {
+            const modal = document.getElementById('transfer-modal');
+            const content = document.getElementById('transfer-modal-content');
+            modal.classList.add('opacity-0'); content.classList.add('translate-y-full', 'scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300); 
+        };
+        
+        window.executeTransfer = function() {
+            const fromKey = document.getElementById('transfer-from').value;
+            const toKey = document.getElementById('transfer-to').value;
+            const amount = parseFloat(document.getElementById('transfer-amount').value);
+            if (fromKey === toKey) return showToast("Cannot transfer to the same account.", true);
+            if (isNaN(amount) || amount <= 0) return showToast("Enter a valid amount.", true);
+
+            const currentFin = calculateCurrentFinancials();
+            let actualFromBal = currentFin.stashes[fromKey];
+            if (amount > actualFromBal) return showToast(`Insufficient funds in source account.`, true);
+
+            window.state.finance.baseStashes[fromKey] = (window.state.finance.baseStashes[fromKey] || 0) - amount;
+            window.state.finance.baseStashes[toKey] = (window.state.finance.baseStashes[toKey] || 0) + amount;
+            
+            if(!window.state.finance.transactions) window.state.finance.transactions = [];
+            window.state.finance.transactions.push({ id: Date.now().toString(), type: 'transfer', from: fromKey, to: toKey, amount: amount, date: new Date().toISOString() });
+            
+            window.saveState(); closeTransferModal(); showToast("Transfer successful!");
+        };
+
+        // Expense Logging
+        window.selectedExpenseCategory = 'food';
+        window.renderExpenseCategories = function() {
+            const container = document.getElementById('expense-categories');
+            if(!container) return; container.innerHTML = '';
+            const cats = [
+                { id: 'leisure', name: 'Leisure', icon: 'fa-mug-hot', color: 'bg-amber-50 text-amber-600 border-amber-100' },
+                { id: 'groceries', name: 'Groceries', icon: 'fa-cart-shopping', color: 'bg-purple-50 text-purple-600 border-purple-100' },
+                { id: 'laundry', name: 'Laundry', icon: 'fa-shirt', color: 'bg-yellow-50 text-yellow-600 border-yellow-200' },
+                { id: 'school', name: 'School', icon: 'fa-graduation-cap', color: 'bg-rose-50 text-rose-500 border-rose-100' },
+                { id: 'food', name: 'Food & Drink', icon: 'fa-bowl-food', color: 'bg-green-50 text-green-600 border-green-200' },
+                { id: 'transport', name: 'Transport', icon: 'fa-bus', color: 'bg-blue-50 text-blue-500 border-blue-100' },
+                { id: 'selfcare', name: 'Self-Care', icon: 'fa-spa', color: 'bg-slate-50 text-slate-500 border-slate-200' },
+                { id: 'shopping', name: 'Shopping', icon: 'fa-bag-shopping', color: 'bg-pink-50 text-pink-500 border-pink-100' },
+                { id: 'health', name: 'Health', icon: 'fa-kit-medical', color: 'bg-teal-50 text-teal-600 border-teal-200' }
+            ];
+            cats.forEach(c => {
+                const isSel = window.selectedExpenseCategory === c.id;
+                const ring = isSel ? `ring-2 ring-offset-1 scale-105 shadow-md ${c.color.split(' ')[1].replace('text-', 'ring-')}` : 'opacity-70 hover:opacity-100';
+                container.innerHTML += `<div onclick="setExpenseCategory('${c.id}')" class="cursor-pointer border ${c.color} ${ring} p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all h-16">
+                    <i class="fa-solid ${c.icon} text-lg mb-1"></i><span class="text-[9px] font-bold leading-tight">${c.name}</span>
+                </div>`;
+            });
+        };
+        
+        window.setExpenseCategory = function(id) { window.selectedExpenseCategory = id; window.renderExpenseCategories(); };
+
+        window.openExpenseModal = function() {
+            document.getElementById('expense-amount').value = '';
+            document.getElementById('expense-date').innerText = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            window.renderExpenseCategories();
+            const modal = document.getElementById('expense-modal'); const content = document.getElementById('expense-modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('translate-y-full', 'scale-95'); }, 10);
+        };
+        
+        window.closeExpenseModal = function() {
+            const modal = document.getElementById('expense-modal'); const content = document.getElementById('expense-modal-content');
+            modal.classList.add('opacity-0'); content.classList.add('translate-y-full', 'scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300); 
+        };
+        
+        window.executeExpense = function() {
+            const amount = parseFloat(document.getElementById('expense-amount').value);
+            const account = document.getElementById('expense-account').value;
+            if (isNaN(amount) || amount <= 0) return showToast("Enter a valid amount.", true);
+
+            const currentFin = calculateCurrentFinancials();
+            let actualBal = currentFin.stashes[account];
+            
+            if (amount > actualBal) return showToast("Insufficient funds in source account.", true);
+
+            window.state.finance.baseStashes[account] = (window.state.finance.baseStashes[account] || 0) - amount;
+            
+            if(!window.state.finance.transactions) window.state.finance.transactions = [];
+            window.state.finance.transactions.push({ id: Date.now().toString(), type: 'expense', category: window.selectedExpenseCategory, account: account, amount: amount, date: new Date().toISOString() });
+            
+            window.saveState(); closeExpenseModal(); showToast("Expense logged successfully!");
+        };
+
+        // Modals for Finance
+        let currentEditWeek = null; let editingDebtKey = null; let editingStashKey = null;
+        
+        window.openEditModal = function(event, weekNum) {
+            event.stopPropagation(); currentEditWeek = weekNum;
+            const base = weeklyData.find(w => w.week === weekNum); const effective = getEffectiveDeposits(weekNum);
+            document.getElementById('modal-week-num').textContent = weekNum; document.getElementById('min-mb').textContent = base.depMB; document.getElementById('min-gl').textContent = base.depGL;
+            const iMB = document.getElementById('input-mb'); const iAT = document.getElementById('input-at'); const iGL = document.getElementById('input-gl'); const iSV = document.getElementById('input-sv');
+            iMB.min = base.depMB; iMB.value = effective.depMB; iAT.min = 0; iAT.value = effective.depAT; iGL.min = base.depGL; iGL.value = effective.depGL; iSV.min = 0; iSV.value = effective.depSV;
+            
+            const modal = document.getElementById('edit-modal'); const content = document.getElementById('modal-content');
+            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
+        };
+        window.closeEditModal = function() {
+            const modal = document.getElementById('edit-modal'); const content = document.getElementById('modal-content');
+            modal.classList.add('opacity-0'); content.classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); currentEditWeek = null; }, 200);
+        };
+        window.saveEditModal = function() {
+            const base = weeklyData.find(w => w.week === currentEditWeek);
+            const valMB = parseFloat(document.getElementById('input-mb').value) || base.depMB; const valAT = parseFloat(document.getElementById('input-at').value) || 0;
+            const valGL = parseFloat(document.getElementById('input-gl').value) || base.depGL; const valSV = parseFloat(document.getElementById('input-sv').value) || base.depSV;
+            if (valMB < base.depMB || valGL < base.depGL || valSV < 0 || valAT < 0) return showToast("Cannot lower baseline amounts (except Atome & Savings)", true);
+            window.state.finance.customDeposits[currentEditWeek] = { depMB: valMB, depAT: valAT, depGL: valGL, depSV: valSV };
+            window.saveState(); closeEditModal();
+        };
+
+        window.openDebtEditModal = function(debtKey) {
+            editingDebtKey = debtKey;
+            document.getElementById('debt-modal-title').textContent = `Edit ${debtKey === 'gLoan' ? 'GLoan' : (debtKey === 'mariBank' ? 'MariBank' : 'Atome')} Debt`;
+            document.getElementById('input-debt-val').value = window.state.finance.debts[debtKey];
+            const modal = document.getElementById('debt-edit-modal'); const content = document.getElementById('debt-modal-content');
+            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
+        };
+        window.closeDebtModal = function() {
+            const modal = document.getElementById('debt-edit-modal'); const content = document.getElementById('debt-modal-content');
+            modal.classList.add('opacity-0'); content.classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); editingDebtKey = null; }, 200);
+        };
+        window.saveDebtModal = function() {
+            if (!editingDebtKey) return; const val = parseFloat(document.getElementById('input-debt-val').value);
+            if (!isNaN(val) && val >= 0) { window.state.finance.debts[editingDebtKey] = val; window.saveState(); closeDebtModal(); } 
+            else showToast("Enter a valid amount (>= 0).", true);
+        };
+
+        window.openStashEditModal = function(stashKey) {
+            editingStashKey = stashKey;
+            const titleMap = {
+                cash: '[CASH] SPENDING', mbSpending: '[MARIBANK] SPENDING', gcash: '[GCASH] SPENDING',
+                mariBank: '[GOTYME] MARIBANK', gLoan: '[GOTYME] GLOAN', savings: '[GOTYME] SAVINGS',
+                atome: '[GOTYME] ATOME', rcbc: '[INVESTING] RCBC'
+            };
+            document.getElementById('stash-modal-title').textContent = `Edit ${titleMap[stashKey]}`;
+            document.getElementById('input-stash-val').value = window.state.finance.baseStashes[stashKey] || 0;
+            const modal = document.getElementById('stash-edit-modal'); const content = document.getElementById('stash-modal-content');
+            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
+        };
+        window.closeStashModal = function() {
+            const modal = document.getElementById('stash-edit-modal'); const content = document.getElementById('stash-modal-content');
+            modal.classList.add('opacity-0'); content.classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); editingStashKey = null; }, 200);
+        };
+        window.saveStashModal = function() {
+            if (!editingStashKey) return; const val = parseFloat(document.getElementById('input-stash-val').value);
+            if (!isNaN(val) && val >= 0) { window.state.finance.baseStashes[editingStashKey] = val; window.saveState(); closeStashModal(); } 
+            else showToast("Enter a valid amount (>= 0).", true);
+        };
+
+        function renderFinance() {
+            const f = calculateCurrentFinancials();
+            let proj = window.state.finance.baseStashes.savings; weeklyData.forEach(w => { proj += getEffectiveDeposits(w.week).depSV; if (w.billAmt > 0 && w.payFrom === 'savings') proj -= w.billAmt; });
+            
+            document.getElementById('net-worth').textContent = formatMoney(f.totals.netWorth);
+            document.getElementById('total-assets').textContent = formatMoney(f.totals.assets);
+            document.getElementById('total-liabilities').textContent = formatMoney(f.totals.liabilities);
+            document.getElementById('projected-savings').textContent = formatMoney(proj);
+
+            document.getElementById('header-borrowed-total').textContent = formatMoney(f.totals.liabilities);
+            document.getElementById('debt-maribank').textContent = formatMoney(f.debts.mb);
+            document.getElementById('debt-gloan').textContent = formatMoney(f.debts.gl);
+            document.getElementById('debt-atome').textContent = formatMoney(f.debts.at);
+
+            document.getElementById('header-assets-total').textContent = `Bal. ${formatMoney(f.totals.assets)}`;
+            if(document.getElementById('stash-cash')) document.getElementById('stash-cash').textContent = formatMoney(f.stashes.cash);
+            if(document.getElementById('stash-mbSpending')) document.getElementById('stash-mbSpending').textContent = formatMoney(f.stashes.mbSpending);
+            if(document.getElementById('stash-gcash')) document.getElementById('stash-gcash').textContent = formatMoney(f.stashes.gcash);
+            if(document.getElementById('stash-maribank')) document.getElementById('stash-maribank').textContent = formatMoney(f.stashes.mariBank);
+            if(document.getElementById('stash-gloan')) document.getElementById('stash-gloan').textContent = formatMoney(f.stashes.gLoan);
+            if(document.getElementById('stash-savings')) document.getElementById('stash-savings').textContent = formatMoney(f.stashes.savings);
+            if(document.getElementById('stash-atome')) document.getElementById('stash-atome').textContent = formatMoney(f.stashes.atome);
+            if(document.getElementById('stash-rcbc')) document.getElementById('stash-rcbc').textContent = formatMoney(f.stashes.rcbc);
+
+            const pct = Math.round((window.state.finance.completedWeeks.length / weeklyData.length) * 100);
+            document.getElementById('progress-bar').style.width = `${pct}%`; document.getElementById('progress-percentage').textContent = `${pct}%`;
+
+            // Render Recent Transactions
+            const tList = document.getElementById('transactions-list');
+            if (tList) {
+                tList.innerHTML = '';
+                let allTx = [...(window.state.finance.transactions || []), ...(window.state.finance.expenses || []).map(e => ({...e, type: 'expense'}))];
+                
+                // Remove duplicates in case of migration overlap
+                const uniqueTx = Array.from(new Map(allTx.map(item => [item.id, item])).values());
+                
+                if (uniqueTx.length === 0) {
+                    tList.innerHTML = `<div class="text-center p-4 text-slate-400 italic text-xs bg-gray-50 rounded-xl border border-dashed border-gray-200">No recent transactions.</div>`;
+                } else {
+                    const acctNames = { cash: '[CASH]', mbSpending: '[MARIBANK]', gcash: '[GCASH]', mariBank: '[GOTYME] MARIBANK', gLoan: '[GOTYME] GLOAN', savings: '[GOTYME] SAVINGS', atome: '[GOTYME] ATOME', rcbc: '[INVESTING] RCBC' };
+                    const catIcons = { leisure: 'fa-mug-hot text-amber-500', groceries: 'fa-cart-shopping text-purple-500', laundry: 'fa-shirt text-yellow-500', school: 'fa-graduation-cap text-rose-500', food: 'fa-bowl-food text-green-500', transport: 'fa-bus text-blue-500', selfcare: 'fa-spa text-slate-500', shopping: 'fa-bag-shopping text-pink-500', health: 'fa-kit-medical text-teal-500' };
+                    
+                    uniqueTx.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 15).forEach(tx => {
+                        const dStr = new Date(tx.date).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+                        if (tx.type === 'expense' || tx.category) {
+                            const cat = tx.category || 'food';
+                            const icon = catIcons[cat] || 'fa-receipt text-gray-500';
+                            tList.innerHTML += `<div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm mb-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100"><i class="fa-solid ${icon} text-sm"></i></div>
+                                    <div>
+                                        <div class="text-xs font-bold text-dark capitalize">${cat}</div>
+                                        <div class="text-[9px] text-slate-400">${acctNames[tx.account]} • ${dStr}</div>
+                                    </div>
+                                </div>
+                                <div class="text-sm font-black text-rose-500">-₱${tx.amount.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                            </div>`;
+                        } else if (tx.type === 'transfer') {
+                            tList.innerHTML += `<div class="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm mb-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100"><i class="fa-solid fa-arrow-right-arrow-left text-blue-500 text-sm"></i></div>
+                                    <div>
+                                        <div class="text-xs font-bold text-dark">Transfer</div>
+                                        <div class="text-[9px] text-slate-400">${acctNames[tx.from]} &rarr; ${acctNames[tx.to]} • ${dStr}</div>
+                                    </div>
+                                </div>
+                                <div class="text-sm font-black text-blue-500">₱${tx.amount.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                            </div>`;
+                        }
+                    });
+                }
+            }
+
+            const c = document.getElementById('weeks-container'); c.innerHTML = '';
+            weeklyData.forEach(w => {
+                const isPaid = window.state.finance.completedWeeks.includes(w.week); const eff = getEffectiveDeposits(w.week);
+                const tag = eff.isEdited ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-indigo-50 text-indigo-700 border border-transparent";
+                
+                c.innerHTML += `<div onclick="toggleWeek(${w.week})" class="rounded-2xl p-4 border transition-all cursor-pointer ${isPaid ? "bg-mint/30 border-mint/40 opacity-75" : "bg-white shadow-sm border-slate-200"}">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-base ${isPaid ? "text-slate-400 line-through" : "text-dark font-bold"}">Week ${w.week} <span class="text-xs font-normal text-slate-500 ml-1 border-l pl-2">${w.date}</span></h3>
+                        ${isPaid ? `<div class="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-white"><i class="fa-solid fa-check text-sm"></i></div>` : `<div class="w-7 h-7 rounded-full border-2 border-slate-300 bg-slate-50"></div>`}
+                    </div>
+                    <div class="details-grid ${isPaid ? '' : 'open'} mt-1"><div class="details-inner">
+                        <div class="pt-3 pb-1 flex flex-wrap gap-1.5">
+                            <span class="bg-gray-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">LIF: ₱${w.lifestyle}</span>
+                            <span class="${tag} px-2 py-1 rounded text-[10px] font-bold">MB: ₱${eff.depMB}</span>
+                            <span class="${tag} px-2 py-1 rounded text-[10px] font-bold">AT: ₱${eff.depAT}</span>
+                            <span class="${tag} px-2 py-1 rounded text-[10px] font-bold">GL: ₱${eff.depGL}</span>
+                            ${eff.depSV > 0 ? `<span class="${tag} px-2 py-1 rounded text-[10px] font-bold">SV: ₱${eff.depSV}</span>` : ''}
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <div class="flex-1">${w.billAmt > 0 ? `<div class="mt-3 flex items-center gap-1.5 bg-rose-50 text-rose-600 px-3 py-2 rounded-xl text-[11px] font-bold border border-rose-100"><i class="fa-solid fa-file-invoice-dollar"></i> Pay ${w.billType}: ${formatMoney(w.billAmt)} from ${w.payFrom.toUpperCase()}</div>` : ''}</div>
+                            <button onclick="openEditModal(event, ${w.week})" class="mt-3 ml-2 flex-shrink-0 bg-white border border-gray-200 text-slate-600 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm hover:bg-slate-50"><i class="fa-solid fa-pen"></i> Edit</button>
+                        </div>
+                    </div></div>
+                </div>`;
+            });
+        }
+
+        window.saveProfileSettings = function() {
+            window.state.acadProfile.year = document.getElementById('set-year').value; window.state.acadProfile.sem = document.getElementById('set-sem').value;
+            window.state.acadProfile.validFrom = document.getElementById('set-valid-from').value; window.state.acadProfile.validUntil = document.getElementById('set-valid-until').value;
+            window.saveState(); showToast("Profile Settings Saved");
+        };
+
+        window.addSubject = function() {
+            const name = document.getElementById('new-subj-name').value.trim(); if(!name) return;
+            if(window.state.subjects.find(x => x.name.toLowerCase() === name.toLowerCase())) return showToast("Subject exists.", true);
+            window.state.subjects.push({ name, color: colorPalette[window.state.subjects.length % colorPalette.length] });
+            document.getElementById('new-subj-name').value = ''; populateSubjectDropdowns(); window.saveState();
+        };
+        window.deleteSubject = function(name) { if(name === 'General') return showToast("Cannot delete General.", true); window.state.subjects = window.state.subjects.filter(x => x.name !== name); populateSubjectDropdowns(); window.saveState(); };
+
+        window.addTemplateClass = function() {
+            const d = document.getElementById('tpl-day').value; const t = document.getElementById('tpl-time').value; const s = document.getElementById('tpl-subj').value; const title = document.getElementById('tpl-title').value.trim();
+            if(!t || !title) return showToast("Time and Title required.", true);
+            if(!window.state.acadProfile.schedule) window.state.acadProfile.schedule = {}; if(!window.state.acadProfile.schedule[d]) window.state.acadProfile.schedule[d] = [];
+            window.state.acadProfile.schedule[d].push({ id: Date.now().toString(), time: t, subj: s, title: title }); document.getElementById('tpl-title').value = ''; window.saveState();
+        };
+        window.deleteTemplateClass = function(dayStr, id) { if(window.state.acadProfile.schedule[dayStr]) { window.state.acadProfile.schedule[dayStr] = window.state.acadProfile.schedule[dayStr].filter(x => x.id !== id); window.saveState(); } };
+
+        function renderSettings() {
+            const p = window.state.acadProfile;
+            document.getElementById('set-year').value = p.year; document.getElementById('set-sem').value = p.sem;
+            document.getElementById('set-valid-from').value = p.validFrom || ''; document.getElementById('set-valid-until').value = p.validUntil || '';
+            const sList = document.getElementById('subjects-list'); sList.innerHTML = '';
+            window.state.subjects.forEach(s => { sList.innerHTML += `<div class="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100"><span class="text-xs font-bold px-2 py-1 rounded border ${s.color} truncate max-w-[200px]">${s.name}</span>${s.name !== 'General' ? `<button onclick="deleteSubject('${s.name}')" class="text-slate-400 hover:text-red-500 p-1 shrink-0"><i class="fa-solid fa-xmark"></i></button>` : ''}</div>`; });
+            const tList = document.getElementById('template-classes-list'); tList.innerHTML = '';
+            const dayNames = { "1":"Monday", "2":"Tuesday", "3":"Wednesday", "4":"Thursday", "5":"Friday", "6":"Saturday", "0":"Sunday" };
+            if(p.schedule) {
+                Object.keys(p.schedule).sort((a,b) => parseInt(a)-parseInt(b)).forEach(day => {
+                    const classes = p.schedule[day];
+                    if(classes && classes.length > 0) {
+                        tList.innerHTML += `<div class="bg-slate-50 border rounded-xl p-3 shadow-inner"><h4 class="font-bold text-slate-700 text-sm mb-3 border-b pb-1">${dayNames[day]}</h4><div class="space-y-2">${classes.sort((a,b)=>a.time.localeCompare(b.time)).map(c => `<div class="p-2 rounded bg-white shadow-sm border ${getSubjStyle(c.subj)} flex justify-between items-center min-w-0"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-xs truncate">${c.title}</div><div class="text-[10px] font-semibold opacity-80">${c.time}</div></div><button onclick="deleteTemplateClass('${day}', '${c.id}')" class="text-slate-300 hover:text-red-500 p-1 shrink-0"><i class="fa-solid fa-trash-can text-xs"></i></button></div>`).join('')}</div></div>`;
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
