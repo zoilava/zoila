@@ -649,7 +649,7 @@
         <div id="debt-edit-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
             <div id="debt-modal-content" class="modal-box bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl transform scale-95">
                 <h3 class="text-lg font-bold text-dark mb-1" id="debt-modal-title">Edit Debt</h3>
-                <p class="text-xs text-slate-500 mb-4">Update the current base amount owed.</p>
+                <p class="text-xs text-slate-500 mb-4">Update your exact current balance. Base values are adjusted automatically.</p>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Current Balance</label>
@@ -666,10 +666,10 @@
         <div id="stash-edit-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-dark/60 backdrop-blur-sm opacity-0 hidden">
             <div id="stash-modal-content" class="modal-box bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-xl transform scale-95">
                 <h3 class="text-lg font-bold text-dark mb-1" id="stash-modal-title">Edit Stash</h3>
-                <p class="text-xs text-slate-500 mb-4">Update the initial base balance of this stash.</p>
+                <p class="text-xs text-slate-500 mb-4">Update your exact current balance. Adjustments will apply automatically.</p>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Base Balance</label>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Current Balance</label>
                         <div class="relative"><span class="absolute left-3 top-2.5 text-slate-500">₱</span><input type="number" id="input-stash-val" step="0.01" class="w-full bg-gray-50 border border-gray-200 text-dark rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-400 outline-none"></div>
                     </div>
                 </div>
@@ -853,6 +853,7 @@
             {name: 'Pedia Surgery', color: colorPalette[10]}, {name: 'Rehab Med', color: colorPalette[11]}
         ];
 
+        // Inject the user's specific schedule for 3rd Year 1st Sem
         const base3rdYear1stSem = {
             "1": [ {id:'b1', time: '07:00', title: 'Medicine II', subj: 'Medicine II'}, {id:'b2', time: '13:00', title: 'Surgery II', subj: 'Surgery II'}, {id:'b3', time: '15:00', title: 'Orthopedic Surgery (Q1)', subj: 'Orthopedic Surg'} ],
             "2": [ {id:'b4', time: '07:00', title: 'Pediatrics II', subj: 'Pediatrics II'}, {id:'b5', time: '10:00', title: 'Behavioral Medicine II', subj: 'Behavioral Med'}, {id:'b6', time: '13:00', title: 'Pediatrics II (Clinical Correlates)', subj: 'Pediatrics II'}, {id:'b7', time: '15:00', title: 'Bioethics III', subj: 'Bioethics III'} ],
@@ -864,8 +865,8 @@
         window.state = {
             tasks: [], schedule: [], finTasks: [], flashcards: [], prompts: [], grades: [], mnemonics: [], links: [...defaultLinks], 
             totalFocusMins: 0, scratchpad: "", subjects: [...defaultSubjects], wellnessLogs: [], nonMedTasks: [],
-            acadProfile: { year: "3", sem: "1", active: true, validFrom: "2026-08-01", validUntil: "2026-12-20", schedule: {} },
-            finance: { completedWeeks: [], customDeposits: {}, debts: { ...initialDebts }, baseStashes: { ...initialBalances } } // Merged Finance State
+            acadProfile: { year: "3", sem: "1", active: true, validFrom: "2026-08-01", validUntil: "2026-12-20", schedule: base3rdYear1stSem },
+            finance: { completedWeeks: [], customDeposits: {}, debts: { ...initialDebts }, baseStashes: { ...initialBalances } } 
         };
 
         const typeColors = {
@@ -895,21 +896,12 @@
         function toLocalDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         function getSubjStyle(name) { const s = (window.state.subjects || []).find(x => x.name === name); return s ? s.color : 'bg-slate-100 text-slate-800 border-slate-200'; }
         
-        // Strict Firebase Path Auth Flow
         async function handleAuth() {
-            // 1. Force local persistence so sessions survive page reloads
-            try {
-                await setPersistence(auth, browserLocalPersistence);
-            } catch (err) {
-                console.warn("Persistence error:", err);
-            }
+            try { await setPersistence(auth, browserLocalPersistence); } catch (err) { console.warn("Persistence error:", err); }
 
-            // 2. Always register the listener first so it can react to any successful login
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     document.getElementById('auth-overlay').classList.add('hidden');
-                    
-                    // Reset loading state for future logouts
                     const authLoading = document.getElementById('auth-loading');
                     const authForm = document.getElementById('auth-form-container');
                     if(authLoading) authLoading.classList.remove('hidden');
@@ -920,7 +912,6 @@
                     document.getElementById('btn-logout-settings').classList.remove('hidden');
                     document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-400"></i> Syncing...';
                     
-                    // STRICT PATH RULE COMPLIANCE
                     fbDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'main');
                     
                     if(unsubscribeFB) unsubscribeFB();
@@ -938,9 +929,8 @@
                                     if(window.state.finance.baseStashes[k] === undefined) window.state.finance.baseStashes[k] = initialBalances[k];
                                 });
                             }
-                            if(!window.state.finTasks) window.state.finTasks = []; // Ensure Treasurer tasks array exists
+                            if(!window.state.finTasks) window.state.finTasks = []; 
                             
-                            // Auto-inject missing subjects into user state
                             if(!window.state.subjects) window.state.subjects = [];
                             defaultSubjects.forEach(ds => {
                                 if(!window.state.subjects.find(s => s.name === ds.name)) window.state.subjects.push(ds);
@@ -952,24 +942,16 @@
                     }, (error) => { console.warn("Snapshot error:", error); });
                 } else {
                     document.getElementById('auth-overlay').classList.remove('hidden');
-                    
-                    // Hide loading spinner and show the actual login form
                     const authLoading = document.getElementById('auth-loading');
                     const authForm = document.getElementById('auth-form-container');
                     if(authLoading) authLoading.classList.add('hidden');
                     if(authForm) authForm.classList.remove('hidden');
-
                     document.getElementById('btn-logout-settings').classList.add('hidden');
                 }
             });
 
-            // 3. Attempt the custom token injection. If it fails, warn instead of throwing a system error.
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                try { 
-                    await signInWithCustomToken(auth, __initial_auth_token); 
-                } catch (e) { 
-                    console.warn("Custom token auth skipped or failed:", e.message); 
-                }
+                try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { console.warn("Custom token auth skipped or failed:", e.message); }
             }
         }
         handleAuth();
@@ -1438,7 +1420,6 @@
             });
         }
 
-        // Wellness Hub Functions
         window.addWellnessLog = function() {
             const date = document.getElementById('well-date').value || toLocalDateStr(new Date());
             const mood = document.getElementById('well-mood').value;
@@ -1503,7 +1484,6 @@
             }
         }
 
-        // Treasurer Basic To-Dos
         window.addFinTask = function() { const n = document.getElementById('fin-task-name').value.trim(); const d = document.getElementById('fin-task-due').value; if(!n) return; window.state.finTasks.push({ id: Date.now().toString(), name: n, dueDate: d || 'No Date', completed: false }); document.getElementById('fin-task-name').value = ''; window.saveState(); };
         window.toggleFinTask = function(id) { const t = window.state.finTasks.find(x => x.id === id); if(t) { t.completed = !t.completed; window.saveState(); } };
         window.deleteFinTask = function(id) { window.state.finTasks = window.state.finTasks.filter(x => x.id !== id); window.saveState(); };
@@ -1524,7 +1504,7 @@
                 list.innerHTML += `<div class="flex items-center p-3 bg-white rounded-lg border border-slate-200 ${t.completed ? 'opacity-50 bg-slate-50' : 'shadow-sm'} mb-2"><button onclick="toggleFinTask('${t.id}')" class="text-xl mr-3 ${t.completed ? 'text-emerald-500' : 'text-slate-300'}"><i class="fa-${t.completed ? 'solid' : 'regular'} fa-circle-check"></i></button><div class="flex-1 min-w-0"><h4 class="font-bold text-sm truncate ${t.completed ? 'line-through text-slate-500' : 'text-slate-800'}">${t.name}</h4><div class="text-[10px] text-slate-500 mt-0.5"><i class="fa-regular fa-calendar mr-1"></i> ${t.dueDate}</div></div><button onclick="deleteFinTask('${t.id}')" class="ml-2 text-slate-400 hover:text-red-500 p-2"><i class="fa-solid fa-trash-can"></i></button></div>`;
             });
         }
-        // Advanced Finance Tracker Logic
+        
         const formatMoney = (amount) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
         
         function getEffectiveDeposits(weekNum) {
@@ -1593,7 +1573,6 @@
             window.saveState();
         };
 
-        // NEW: Transfer and Expense Feature Logic
         window.openTransferModal = function() {
             document.getElementById('transfer-amount').value = '';
             document.getElementById('transfer-date').innerText = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -1719,18 +1698,47 @@
         window.openDebtEditModal = function(debtKey) {
             editingDebtKey = debtKey;
             document.getElementById('debt-modal-title').textContent = `Edit ${debtKey === 'gLoan' ? 'GLoan' : (debtKey === 'mariBank' ? 'MariBank' : 'Atome')} Debt`;
-            document.getElementById('input-debt-val').value = window.state.finance.debts[debtKey];
+            
+            // Pre-fill with CURRENT calculated balance instead of base balance
+            const currentFin = calculateCurrentFinancials();
+            const shortKey = debtKey === 'mariBank' ? 'mb' : (debtKey === 'gLoan' ? 'gl' : 'at');
+            document.getElementById('input-debt-val').value = currentFin.debts[shortKey] || 0;
+            
             const modal = document.getElementById('debt-edit-modal'); const content = document.getElementById('debt-modal-content');
             modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
         };
+        
         window.closeDebtModal = function() {
             const modal = document.getElementById('debt-edit-modal'); const content = document.getElementById('debt-modal-content');
             modal.classList.add('opacity-0'); content.classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); editingDebtKey = null; }, 200);
         };
+        
         window.saveDebtModal = function() {
-            if (!editingDebtKey) return; const val = parseFloat(document.getElementById('input-debt-val').value);
-            if (!isNaN(val) && val >= 0) { window.state.finance.debts[editingDebtKey] = val; window.saveState(); closeDebtModal(); } 
-            else showToast("Enter a valid amount (>= 0).", true);
+            if (!editingDebtKey) return; 
+            const targetVal = parseFloat(document.getElementById('input-debt-val').value);
+            
+            if (!isNaN(targetVal) && targetVal >= 0) { 
+                let totalPayments = 0;
+                window.state.finance.completedWeeks.forEach(weekNum => {
+                    const w = weeklyData.find(d => d.week === weekNum);
+                    if (w && w.billAmt > 0 && w.payFrom !== 'None') {
+                        if (editingDebtKey === 'mariBank' && w.billType.includes('MariBank')) totalPayments += w.billAmt;
+                        else if (editingDebtKey === 'gLoan' && w.billType === 'GLoan') totalPayments += w.billAmt;
+                        else if (editingDebtKey === 'atome' && w.billType === 'Atome') totalPayments += w.billAmt;
+                        else if (w.billType === 'Atome & GLoan') {
+                            if (editingDebtKey === 'atome') totalPayments += 1600;
+                            if (editingDebtKey === 'gLoan') totalPayments += (w.billAmt - 1600);
+                        }
+                    }
+                });
+                
+                // Set the NEW Base Debt so the CURRENT Debt equals targetVal
+                window.state.finance.debts[editingDebtKey] = targetVal + totalPayments;
+                window.saveState(); 
+                closeDebtModal(); 
+            } else {
+                showToast("Enter a valid amount (>= 0).", true);
+            }
         };
 
         window.openStashEditModal = function(stashKey) {
@@ -1741,18 +1749,37 @@
                 atome: '[GOTYME] ATOME', rcbc: '[INVESTING] RCBC'
             };
             document.getElementById('stash-modal-title').textContent = `Edit ${titleMap[stashKey]}`;
-            document.getElementById('input-stash-val').value = window.state.finance.baseStashes[stashKey] || 0;
+            
+            // Pre-fill with CURRENT calculated balance instead of base balance
+            const currentFin = calculateCurrentFinancials();
+            document.getElementById('input-stash-val').value = currentFin.stashes[stashKey] || 0;
+            
             const modal = document.getElementById('stash-edit-modal'); const content = document.getElementById('stash-modal-content');
             modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
         };
+        
         window.closeStashModal = function() {
             const modal = document.getElementById('stash-edit-modal'); const content = document.getElementById('stash-modal-content');
             modal.classList.add('opacity-0'); content.classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); editingStashKey = null; }, 200);
         };
+        
         window.saveStashModal = function() {
-            if (!editingStashKey) return; const val = parseFloat(document.getElementById('input-stash-val').value);
-            if (!isNaN(val) && val >= 0) { window.state.finance.baseStashes[editingStashKey] = val; window.saveState(); closeStashModal(); } 
-            else showToast("Enter a valid amount (>= 0).", true);
+            if (!editingStashKey) return; 
+            const targetVal = parseFloat(document.getElementById('input-stash-val').value);
+            
+            if (!isNaN(targetVal) && targetVal >= 0) { 
+                const currentFin = calculateCurrentFinancials();
+                const currentCalc = currentFin.stashes[editingStashKey] || 0;
+                
+                // Calculate the difference and apply it directly to the base
+                const diff = targetVal - currentCalc;
+                window.state.finance.baseStashes[editingStashKey] = (window.state.finance.baseStashes[editingStashKey] || 0) + diff;
+                
+                window.saveState(); 
+                closeStashModal(); 
+            } else {
+                showToast("Enter a valid amount (>= 0).", true);
+            }
         };
 
         function renderFinance() {
